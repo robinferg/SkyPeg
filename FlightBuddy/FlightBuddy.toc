@@ -24,6 +24,8 @@ PuttCourse_arathi.lua
 PuttHard.lua
 Social.lua
 Versus.lua
+DeathRoll.lua
+DeathRollUI.lua
 Route.lua
 Board.lua
 Menu.lua

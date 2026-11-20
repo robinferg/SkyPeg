@@ -51,6 +51,7 @@ local function Setup()
     end
     NS.Social:Init(db)
     if NS.Versus then NS.Versus:Init(db.putt or db) end
+    if NS.DeathRoll then NS.DeathRoll:Init(db); NS.DeathRollUI:Init(db.dr) end
     NS.Peg:Init(db.peg)
     NS.PuttUI:Init(db.putt)
     NS.FlapUI:Init(db.flap)
@@ -192,6 +193,7 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
         if NS.db then
             NS.Social:OnMessage(a1, a2, a3, a4)
             if NS.Versus then NS.Versus:OnMessage(a1, a2, a3, a4) end
+            if NS.DeathRoll then NS.DeathRoll:OnMessage(a1, a2, a3, a4) end
         end
     end
 end)
@@ -200,6 +202,7 @@ ev:SetScript("OnUpdate", function(_, el)
     if not NS.db then return end
     NS.Social:Pump(el)
     if NS.Versus then NS.Versus:Pump(el) end
+    if NS.DeathRoll then NS.DeathRoll:Pump(el) end
     pollAcc = pollAcc + el
     if pollAcc < 0.25 then return end
     pollAcc = 0
@@ -243,6 +246,7 @@ local TAB_ALIASES = { peg = "peg", skypeg = "peg", peggle = "peg",
     putt = "putt", golf = "putt", greens = "putt",
     flap = "flap", featherbeard = "flap", gryphon = "flap", fly = "flap",
     pin = "pin", pinball = "pin", tinker = "pin", hightinker = "pin",
+    roll = "roll", deathroll = "roll", dice = "roll",
     gem = "gem", gems = "gem", jewel = "gem", jewelcrafter = "gem", match = "gem",
     home = "home", tavern = "home" }
 
@@ -282,6 +286,9 @@ SLASH_FLIGHTBUDDYPEG2 = "/peg"
 SlashCmdList.FLIGHTBUDDYPEG = function(msg)
     if msg and msg ~= "" then Slash(msg) else Slash("", "peg") end
 end
+SLASH_FLIGHTBUDDYDR1 = "/deathroll"
+SLASH_FLIGHTBUDDYDR2 = "/droll"
+SlashCmdList.FLIGHTBUDDYDR = function(msg) if NS.db and NS.DeathRoll then NS.DeathRoll:Slash(msg) end end
 SLASH_FLIGHTBUDDYPUTT1 = "/putt"
 SlashCmdList.FLIGHTBUDDYPUTT = function() Slash("", "putt") end
 SLASH_FLIGHTBUDDYFLAP1 = "/featherbeard"

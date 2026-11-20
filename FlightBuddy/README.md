@@ -86,3 +86,14 @@ Open Gryphon Greens, choose **Versus** from the menu, and invite up to three pla
 - Pick the course and 3 or 6 holes in the lobby. Matches stay off the leaderboards.
 - Challenges only pop up from people in your group, on your friends list or in your guild.
 - No server: each shot is one small hidden addon whisper, replayed on the other players' screens.
+
+
+## Death Roll
+
+One-on-one death rolls with a wager. Open the **Roll** tab (or type `/deathroll`), set a wager and a starting number, and challenge your target, a group member or anyone by name (`/deathroll Name 50`). They get an Accept/Decline pop-up.
+
+- Rolls are the game's real `/roll`: first 1 to the starting number, then 1 to whatever was rolled last. Roll a 1 and you lose.
+- Each roll plays out as a hit in the Brawler's Pit: your roll is the health you are left with.
+- The loser can pay up (the addon opens the trade and fills in the amount) or ask for double or nothing.
+- The ledger tracks who owes whom, plus your wins, losses and net gold.
+- Guildmates and groupmates with Flight Buddy get a notice and can watch live. Challenges only pop up from friends, guildmates and group members.

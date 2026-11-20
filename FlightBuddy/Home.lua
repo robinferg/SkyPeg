@@ -28,6 +28,9 @@ UI.GAMES = {
       art = "gems\\gem_velvet", coords = { 0, 1, 0.3, 0.55 }, tint = { 0.2, 0.24, 0.52 }, board = "gemd", daily = true, ink = { 0.20, 0.26, 0.55 },
       sprites = { { "gems\\gem_ruby", { 0, 1, 0, 1 }, -78, 34 }, { "gems\\gem_sapphire", { 0, 1, 0, 1 }, -40, 34 }, { "gems\\gem_prism", { 0, 1, 0, 1 }, 0, 38 },
                   { "gems\\gem_emerald", { 0, 1, 0, 1 }, 40, 34 }, { "gems\\gem_topaz", { 0, 1, 0, 1 }, 78, 34 } } },
+    { key = "roll", name = "Death Roll", tag = "Wager gold on the roll of the dice",
+      art = "deathroll\\dr_arena", coords = { 0.0, 1.0, 0.215, 0.305 }, ink = { 0.52, 0.12, 0.08 },
+      sprites = { { "deathroll\\dr_die", { 0, 1, 0, 1 }, -46, 38 }, { "deathroll\\dr_icon", { 0, 1, 0, 1 }, 0, 46 }, { "deathroll\\dr_die_skull", { 0, 1, 0, 1 }, 46, 38 } } },
 }
 
 local function Today() return NS.Social and NS.Social.Today() or (date and date("%Y%m%d")) or "" end
@@ -347,7 +350,13 @@ end
 function UI:CardStat(g)
     local db = NS.db
     local S = NS.Social
-    if g.key == "peg" then
+    if g.key == "roll" then
+        local s = db.dr
+        local played = s and ((s.wins or 0) + (s.losses or 0)) or 0
+        if played == 0 then return "Challenge a friend" end
+        local net = s.net or 0
+        return ("%d won, %d lost  |  %s%s"):format(s.wins, s.losses, net >= 0 and "+" or "-", NS.DeathRoll.Money(math.abs(net)))
+    elseif g.key == "peg" then
         local run = db.peg and db.peg.run
         local best = db.peg and db.peg.bestLevelScore or 0
         return run and ("Stage " .. (run.level or 1) .. "  |  best " .. W.Short(best)) or (best > 0 and ("Best " .. W.Short(best)) or "A hero awaits"), "rb", "all"

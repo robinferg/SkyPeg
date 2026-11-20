@@ -1,6 +1,7 @@
 # Flight Buddy changelog
 
 ## 2.1.0
+- **Death Roll:** a new game. Challenge anyone to a one-on-one death roll for gold, like a duel request, from the Roll tab or `/deathroll Name 50`. Rolls use the real `/roll`, every roll plays out as a blow in the Brawler's Pit, the loser can go double or nothing, and guildmates and groupmates with Flight Buddy can watch the play-by-play
 - **Versus:** live mini golf against up to three other players. Everyone plays the same course at once and you watch the other balls roll. Open Gryphon Greens, choose Versus, and invite your group, your target or anyone by name (`/fb vs Name`)
 - **Tornadoes** now grab the ball, spin it up the funnel and throw it, and they take a ball that is sitting still too
 - Hazards no longer wait for you to putt: a drum beat, a rising tide or a mage will move a ball left sitting in range (no stroke counted)

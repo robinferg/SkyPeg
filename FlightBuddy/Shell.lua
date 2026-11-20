@@ -18,13 +18,14 @@ Shell.TABS = {
     { key = "flap", short = "Gryphon",  label = "Featherbeard", icon = "Interface\\Icons\\Ability_Mount_Gryphon_01", sub = "Gryphon flight", neon = { 1.0, 0.75, 0.30 } },
     { key = "gem",   label = "Jewelcrafter", short = "Gems", icon = "Interface\\Icons\\INV_Misc_Gem_01", sub = "Jewelcrafter's Bench", daily = true, neon = { 0.6, 0.8, 1 } },
     { key = "pin",   label = "Pinball", icon = "Interface\\Icons\\Trade_Engineering", sub = "High Tinker Pinball", neon = { 1.0, 0.55, 0.20 } },
+    { key = "roll",  label = "Death Roll", short = "Roll", icon = W.MEDIA .. "deathroll\\dr_icon", fullIcon = true, sub = "Death Roll", neon = { 1.0, 0.3, 0.25 } },
 }
 
 local function InCombat() return InCombatLockdown and InCombatLockdown() end
 
 function Shell:Init(db)
     self.db = db
-    self.mods = { home = NS.Home, peg = NS.Peg, putt = NS.PuttUI, flap = NS.FlapUI, pin = NS.PinballUI, gem = NS.GemsUI }
+    self.mods = { home = NS.Home, peg = NS.Peg, putt = NS.PuttUI, flap = NS.FlapUI, pin = NS.PinballUI, gem = NS.GemsUI, roll = NS.DeathRollTab }
 end
 
 function Shell:IsShown() return self.frame and self.frame:IsShown() end
@@ -164,7 +165,7 @@ function Shell:Build()
         b.icon:SetSize(16, 16)
         b.icon:SetPoint("LEFT", 8, 0)
         b.icon:SetTexture(t.icon)
-        b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        if t.fullIcon then b.icon:SetTexCoord(0, 1, 0, 1); b.icon:SetSize(18, 18) else b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
         b.dot = W.Tex(b, "OVERLAY", "circle")
         b.dot:SetSize(7, 7)
         b.dot:SetPoint("RIGHT", -10, 0)
@@ -254,7 +255,7 @@ function Shell:SelectTab(key)
     local m = self.mods[key]
     if not m.frame then m:Build(self.content) end
     -- the wooden picture frame goes round game boards, not the tavern's common room
-    if self.bezel then self.bezel:SetShown(key ~= "home") end
+    if self.bezel then self.bezel:SetShown(key ~= "home" and key ~= "roll") end
     m.frame:Show()
     if m.OnShow then m:OnShow() end
     for k, b in pairs(self.tabButtons) do
