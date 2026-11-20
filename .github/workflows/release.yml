@@ -1,0 +1,70 @@
+# Publishes Flight Buddy to CurseForge whenever a version tag (v2.1.0, v2.1.1, ...) is pushed.
+# One-time setup: add your CurseForge API token as the repository secret CF_API_KEY
+# (Settings > Secrets and variables > Actions > New repository secret).
+name: Release to CurseForge
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  CF_PROJECT_ID: "1801733"
+  GAME_VERSION: "1.60.1"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the version and its changelog
+        run: |
+          VERSION=$(grep -m1 '^## Version:' FlightBuddy/FlightBuddy.toc | sed 's/^## Version: *//' | tr -d '\r ')
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the TOC version $VERSION"
+            exit 1
+          fi
+          awk -v v="$VERSION" '$0 ~ "^## "v"($|[^0-9.])" {on=1; next} on && /^## / {exit} on' CHANGELOG.md | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > changelog.txt
+          if [ ! -s changelog.txt ]; then
+            echo "::error::CHANGELOG.md has no section for $VERSION"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Changelog for $VERSION:"; cat changelog.txt
+
+      - name: Build the zip
+        run: |
+          zip -q -r -9 "FlightBuddy-$VERSION.zip" FlightBuddy
+          ls -la "FlightBuddy-$VERSION.zip"
+
+      - name: Upload to CurseForge
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+        run: |
+          if [ -z "$CF_API_KEY" ]; then
+            echo "::error::The CF_API_KEY secret is not set on this repository"
+            exit 1
+          fi
+          curl -fsS -H "X-Api-Token: $CF_API_KEY" https://wow.curseforge.com/api/game/versions -o versions.json
+          GV_ID=$(jq -r --arg n "$GAME_VERSION" '[.[] | select(.name == $n)][0].id // empty' versions.json)
+          if [ -z "$GV_ID" ]; then
+            echo "::error::CurseForge has no game version named $GAME_VERSION. Names starting the same way:"
+            jq -r --arg n "${GAME_VERSION%.*}" '.[] | select(.name | startswith($n)) | "\(.id)  \(.name)"' versions.json | head -40
+            exit 1
+          fi
+          echo "Game version $GAME_VERSION is id $GV_ID"
+          META=$(jq -n --rawfile cl changelog.txt --arg name "Flight Buddy $VERSION" --argjson gv "$GV_ID" \
+            '{changelog: $cl, changelogType: "markdown", displayName: $name, gameVersions: [$gv], releaseType: "release"}')
+          curl -sS -o response.json -w "%{http_code}" -H "X-Api-Token: $CF_API_KEY" \
+            --form-string "metadata=$META" -F "file=@FlightBuddy-$VERSION.zip" \
+            "https://wow.curseforge.com/api/projects/$CF_PROJECT_ID/upload-file" > status.txt
+          echo "CurseForge answered $(cat status.txt): $(cat response.json)"
+          [ "$(cat status.txt)" = "200" ] || exit 1
+
+      - name: Attach the zip to a GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "FlightBuddy-$VERSION.zip" --title "Flight Buddy $VERSION" --notes-file changelog.txt

@@ -1,0 +1,41 @@
+## Interface: 16001, 11507, 20505, 30405, 40402, 50500, 110207, 120001
+## Title: Flight |cffff9e2eBuddy|r
+## Notes: A tavern full of minigames for your flight paths: Rune Breaker, Gryphon Greens mini golf, Featherbeard, High Tinker Pinball and Jewelcrafter's Bench. /fb
+## Author: Robin Ferguson
+## Version: 2.1.0
+## SavedVariables: FlightBuddyDB
+## IconTexture: Interface\Minimap\Tracking\FlightMaster
+## AddonCompartmentFunc: FlightBuddy_OnAddonCompartmentClick
+
+Widgets.lua
+Game.lua
+Levels.lua
+Putt.lua
+PuttHoles.lua
+PuttCourse_human.lua
+PuttCourse_dwarf.lua
+PuttCourse_mulgore.lua
+PuttCourse_gnome.lua
+PuttCourse_nelf.lua
+PuttCourse_orc.lua
+PuttCourse_troll.lua
+PuttCourse_undead.lua
+PuttCourse_arathi.lua
+PuttHard.lua
+Social.lua
+Versus.lua
+Route.lua
+Board.lua
+Menu.lua
+Picker.lua
+Home.lua
+PegUI.lua
+PuttUI.lua
+Flap.lua
+FlapUI.lua
+Pinball.lua
+PinballUI.lua
+Gems.lua
+GemsUI.lua
+Shell.lua
+Core.lua
