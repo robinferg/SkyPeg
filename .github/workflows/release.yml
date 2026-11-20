@@ -1,4 +1,6 @@
-# Publishes Flight Buddy to CurseForge whenever a version tag (v2.1.0, v2.1.1, ...) is pushed.
+# Publishes Flight Buddy to CurseForge. Two ways to start it:
+#   1. Actions tab > "Release to CurseForge" > Run workflow (releases the version in the TOC from main)
+#   2. Push a version tag (v2.1.0, v2.1.1, ...)
 # One-time setup: add your CurseForge API token as the repository secret CF_API_KEY
 # (Settings > Secrets and variables > Actions > New repository secret).
 name: Release to CurseForge
@@ -6,6 +8,7 @@ name: Release to CurseForge
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 env:
   CF_PROJECT_ID: "1801733"
@@ -20,13 +23,24 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Read the version and its changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(grep -m1 '^## Version:' FlightBuddy/FlightBuddy.toc | sed 's/^## Version: *//' | tr -d '\r ')
-          TAG="${GITHUB_REF_NAME#v}"
-          if [ "$TAG" != "$VERSION" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match the TOC version $VERSION"
-            exit 1
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            TAG="${GITHUB_REF_NAME#v}"
+            if [ "$TAG" != "$VERSION" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match the TOC version $VERSION"
+              exit 1
+            fi
+          else
+            # started by hand: never publish the same version twice
+            if [ -n "$(git ls-remote --tags origin "refs/tags/v$VERSION")" ] || gh release view "v$VERSION" >/dev/null 2>&1; then
+              echo "::error::Version $VERSION has already been released. Raise the version in FlightBuddy.toc and CHANGELOG.md first."
+              exit 1
+            fi
           fi
+          echo "RELEASE_TAG=v$VERSION" >> "$GITHUB_ENV"
           awk -v v="$VERSION" '$0 ~ "^## "v"($|[^0-9.])" {on=1; next} on && /^## / {exit} on' CHANGELOG.md | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > changelog.txt
           if [ ! -s changelog.txt ]; then
             echo "::error::CHANGELOG.md has no section for $VERSION"
@@ -67,4 +81,9 @@ jobs:
       - name: Attach the zip to a GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" "FlightBuddy-$VERSION.zip" --title "Flight Buddy $VERSION" --notes-file changelog.txt
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "FlightBuddy-$VERSION.zip" --clobber
+          else
+            gh release create "$RELEASE_TAG" "FlightBuddy-$VERSION.zip" --target "$GITHUB_SHA" --title "Flight Buddy $VERSION" --notes-file changelog.txt
+          fi
