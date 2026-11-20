@@ -1528,7 +1528,7 @@ NS.PuttCourses.arathi = { key = "arathi", name = "Arathi Highlands", holes = {
         cup = { 389, 398 },
         bumpers = {  },
         portals = {  },
-        extra = { coins = { { 268, 268 } } },
+        extra = { coins = { { 268, 264 } } },
         ramps = {  },
         movers = { { kind = "patrol", faction = "syndicate", r = 12, x1 = 352, y1 = 300, x2 = 412, y2 = 300, spd = { 0.55, 0.75 } } },
         fans = {  },

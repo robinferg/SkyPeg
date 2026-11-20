@@ -317,7 +317,7 @@ NS.PuttCourses.undead = { key = "undead", name = "Tirisfal Glades", holes = {
         cup = { 101, 314 },
         bumpers = {  },
         portals = {  },
-        extra = { coins = { { 225, 68 } } },
+        extra = { coins = { { 230, 71 } } },
         ramps = {  },
         cannons = {  },
         movers = { { kind = "patrol", faction = "ghoul", r = 12, x1 = 310, y1 = 230, x2 = 395, y2 = 230, spd = { 0.5, 0.7 } } },

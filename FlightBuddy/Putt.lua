@@ -634,6 +634,7 @@ function Putt:NextHole()
     for _, c in ipairs(hole.coins or NONE) do c.got = nil end
     self.coinsGot = 0
     self.shots = {}
+    self.fanPin = nil
     self.grace = self.index > 1 and 1.2 or 0 -- a moment to read each new hole
     self.state = "aim"
     self:Emit("hole", self.index, hole)
@@ -690,6 +691,7 @@ function Putt:Shoot(angle, power)
     b.age, b.slow, b.portalLock, b.travel, b.tunnel, b.knocked = 0, 0, nil, 0, nil, nil
     b.air, b.z, b.twist, b.whirled, b.lift = nil, nil, nil, nil, nil
     b.twistCd = nil   -- every putt starts clean, so a replay of the shot on another client matches
+    self.fanPin = nil
     b.still, b.windy, b.boosted = 0, false, false
     b.hexed, b.hexT = nil, nil
     b.carry, b.carryLock = nil, nil
@@ -769,9 +771,11 @@ function Putt:Update(dt)
             end
         end
         if self.state == "aim" then self:RestActors(dt) end
+        if self.state == "aim" then self:RestFans() end
     elseif self.state == "aim" and self.ball then
         self:MoveObstacles(dt)
         self:RestActors(dt)
+        if self.state == "aim" then self:RestFans() end
     elseif self.state == "sunk" then
         self:MoveObstacles(dt)
         self.sunkT = self.sunkT - dt
@@ -1110,6 +1114,42 @@ function Putt:RestActors(dt)
     end
 end
 
+-- A ball left sitting in a fan's stream is blown off down it, the same as a rolling one, with no stroke
+-- counted. Only where the wind beats the ground's grip, and never twice from the same spot: a ball the
+-- fan has already pinned against a rail stays put until you putt it.
+function Putt:RestFans()
+    local hole, b = self.hole, self.ball
+    if not hole.fans[1] or (self.grace or 0) > 0 then return end
+    if self.rest.x == hole.tee.x and self.rest.y == hole.tee.y and b.x == hole.tee.x and b.y == hole.tee.y then return end
+    local t = TERRAIN[Putt.Cell(hole, b.x, b.y) or " "] or TERRAIN["."]
+    local grip = (t.decel or P.DECEL) * 1.15
+    local pin = self.fanPin
+    for i, f in ipairs(hole.fans) do
+        if f.period then f.off = ((hole.clock or 0) % f.period) > f.period * 0.45 end
+        if not f.off then
+            local rx, ry = b.x - f.x, b.y - f.y
+            local along = rx * f.dx + ry * f.dy
+            local perp = abs(rx * f.dy - ry * f.dx)
+            if along > 0 and along < f.len and perp < f.width / 2 then
+                local k = f.force * (1 - 0.5 * along / f.len) * (1 - perp / (f.width / 2) * 0.3)
+                local pinned = pin and pin.i == i and (b.x - pin.x) ^ 2 + (b.y - pin.y) ^ 2 < 9
+                if k > grip and not pinned then
+                    self.fanPin = { i = i, x = b.x, y = b.y }
+                    b.vx, b.vy = f.dx * 30, f.dy * 30
+                    b.age, b.slow, b.portalLock, b.travel, b.tunnel, b.still = 0, 0, nil, 0, nil, 0
+                    b.windy = true
+                    b.knocked = true
+                    self.acc = 0
+                    self.state = "roll"
+                    self:Emit("gust", f)
+                    self:Emit("knocked")
+                    return true
+                end
+            end
+        end
+    end
+end
+
 -- collide ball with a segment (x1,y1)-(x2,y2) whose surface moves with (svx, svy)
 local function hitSegment(b, x1, y1, x2, y2, e, svx, svy, r)
     local ex, ey = x2 - x1, y2 - y1
@@ -1281,17 +1321,24 @@ function Putt:Step(h)
         b.x, b.y = wx + cos(ang) * rad, wy + sin(ang) * rad
         b.z = 1.5 * k
         if k >= 1 then
-            -- thrown clear, the way it was facing when the funnel let go. It comes down on open ground
-            -- if there is any along that line; if not, it lands where it lands.
-            local ux, uy = cos(ang), sin(ang)
+            -- thrown clear, the way it was facing when the funnel let go. It always comes down on open
+            -- ground on the course: if there is none along that line, the throw swings round, a little
+            -- at a time, to the nearest heading that has some.
             local want = a.throw or 125
-            local dist
-            for _, d in ipairs({ 0, 12, 24, -14, -28, -42, -56, -70, -84, -98 }) do
-                local lx, ly = b.x + ux * (want + d), b.y + uy * (want + d)
-                local lt = TERRAIN[Putt.Cell(hole, lx, ly) or " "]
-                if lt and not lt.hazard and not lt.pit and Putt.Clearance(hole, lx, ly) >= P.BALL_R + 1 then dist = want + d; break end
+            local ux, uy, dist
+            for _, turn in ipairs({ 0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.75, -1.75, 2.1, -2.1, 2.45, -2.45, 2.8, -2.8, 3.14 }) do
+                local cx, cy = cos(ang + turn), sin(ang + turn)
+                for _, d in ipairs({ 0, 12, 24, -14, -28, -42, -56, -70, -84, -98 }) do
+                    local lx, ly = b.x + cx * (want + d), b.y + cy * (want + d)
+                    local lt = TERRAIN[Putt.Cell(hole, lx, ly) or " "]
+                    if lt and not lt.hazard and not lt.pit and Putt.Clearance(hole, lx, ly) >= P.BALL_R + 1 then
+                        ux, uy, dist = cx, cy, want + d
+                        break
+                    end
+                end
+                if dist then break end
             end
-            dist = dist or want
+            if not dist then ux, uy, dist = cos(ang), sin(ang), 20 end   -- nowhere at all: it drops beside the funnel
             b.twist, b.twistCd = nil, 1.5
             b.air = { t = 0, dur = 0.55 + dist / 420, fx = b.x, fy = b.y, tx = b.x + ux * dist, ty = b.y + uy * dist,
                       vx = ux * 130, vy = uy * 130, z0 = b.z, twister = a }

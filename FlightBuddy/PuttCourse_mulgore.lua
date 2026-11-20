@@ -925,7 +925,7 @@ NS.PuttCourses.mulgore = { key = "mulgore", name = "Mulgore", holes = {
         cup = { 382, 83 },
         bumpers = { { 150, 190, 10 } },
         portals = {  },
-        extra = { coins = { { 170, 330 } } },
+        extra = { coins = { { 160, 335 } } },
         ramps = {  },
         cannons = {  },
         movers = { { kind = "patrol", faction = "raptor", r = 12, x1 = 45, y1 = 285, x2 = 150, y2 = 285, spd = { 0.5, 0.7 } } },

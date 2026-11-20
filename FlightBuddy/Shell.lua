@@ -12,13 +12,13 @@ local WIN_W, WIN_H = 580, 830
 local CONTENT_X, CONTENT_Y = 30, -80   -- the cabinet screen
 
 Shell.TABS = {
-    { key = "home",  label = "Tavern", icon = "Interface\\Icons\\INV_Drink_04", sub = "The common room", neon = { 1.0, 0.8, 0.4 } },
-    { key = "peg", short = "Runes",   label = "Rune Breaker", icon = "Interface\\Icons\\INV_Misc_Rune_01", sub = "Rune Breaker", neon = { 1.0, 0.55, 0.15 } },
-    { key = "putt",  label = "Greens",    icon = "Interface\\Icons\\INV_Misc_Orb_01",        sub = "Daily putt", daily = true, neon = { 0.35, 0.95, 0.45 } },
-    { key = "flap", short = "Gryphon",  label = "Featherbeard", icon = "Interface\\Icons\\Ability_Mount_Gryphon_01", sub = "Gryphon flight", neon = { 1.0, 0.75, 0.30 } },
-    { key = "gem",   label = "Jewelcrafter", short = "Gems", icon = "Interface\\Icons\\INV_Misc_Gem_01", sub = "Jewelcrafter's Bench", daily = true, neon = { 0.6, 0.8, 1 } },
-    { key = "pin",   label = "Pinball", icon = "Interface\\Icons\\Trade_Engineering", sub = "High Tinker Pinball", neon = { 1.0, 0.55, 0.20 } },
-    { key = "roll",  label = "Death Roll", short = "Roll", icon = W.MEDIA .. "deathroll\\dr_icon", fullIcon = true, sub = "Death Roll", neon = { 1.0, 0.3, 0.25 } },
+    { key = "home", full = "Tavern", tip = "The common room: every game, today's specials and the latest talk", tok = "tok_home",  label = "Tavern", icon = "Interface\\Icons\\INV_Drink_04", sub = "The common room", neon = { 1.0, 0.8, 0.4 } },
+    { key = "peg", full = "Rune Breaker", tip = "Shatter runes with Warcraft heroes", tok = "tok_runes", short = "Runes",   label = "Rune Breaker", icon = "Interface\\Icons\\INV_Misc_Rune_01", sub = "Rune Breaker", neon = { 1.0, 0.55, 0.15 } },
+    { key = "putt", full = "Gryphon Greens", tip = "Mini golf against the clock", tok = "tok_greens",  label = "Greens",    icon = "Interface\\Icons\\INV_Misc_Orb_01",        sub = "Daily putt", daily = true, neon = { 0.35, 0.95, 0.45 } },
+    { key = "flap", full = "Featherbeard", tip = "Fly a gryphon through Dun Morogh", tok = "tok_gryphon", short = "Gryphon",  label = "Featherbeard", icon = "Interface\\Icons\\Ability_Mount_Gryphon_01", sub = "Gryphon flight", neon = { 1.0, 0.75, 0.30 } },
+    { key = "gem", full = "Jewelcrafter's Bench", tip = "Cut gems three in a row", tok = "tok_gems",   label = "Jewelcrafter", short = "Gems", icon = "Interface\\Icons\\INV_Misc_Gem_01", sub = "Jewelcrafter's Bench", daily = true, neon = { 0.6, 0.8, 1 } },
+    { key = "pin", full = "High Tinker Pinball", tip = "Gnomish pinball in Tinker Town", tok = "tok_pinball",   label = "Pinball", icon = "Interface\\Icons\\Trade_Engineering", sub = "High Tinker Pinball", neon = { 1.0, 0.55, 0.20 } },
+    { key = "roll", full = "Death Roll", tip = "Wager gold on the roll of the dice", tok = "tok_roll",  label = "Death Roll", short = "Roll", icon = W.MEDIA .. "deathroll\\dr_icon", fullIcon = true, sub = "Death Roll", neon = { 1.0, 0.3, 0.25 } },
 }
 
 local function InCombat() return InCombatLockdown and InCombatLockdown() end
@@ -146,34 +146,64 @@ function Shell:Build()
         if m and m.ShowHelp then m:ShowHelp() end
     end)
 
-    -- tabs: oak planks across the top; the chosen game's plank is lit like a brass-trimmed plaque
+    -- game tokens: a row of round painted badges, one per game, with keyhole slots for games to come
     self.tabButtons = {}
-    local nTabs = #Shell.TABS
-    local gap = 4
-    local tabW = math.min(156, math.floor((WIN_W - 56 - gap * (nTabs - 1)) / nTabs))
-    local x = math.floor((WIN_W - (tabW * nTabs + gap * (nTabs - 1))) / 2)
-    for i, t in ipairs(Shell.TABS) do
-        local b = W.Button(f, tabW, 28, "", "tab")
-        b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -84)
-        b.neon = t.neon
-        b.text:ClearAllPoints()
-        b.text:SetPoint("LEFT", 27, 0)
-        b.text:SetPoint("RIGHT", -6, 0)
-        b.text:SetJustifyH("LEFT")
-        b.text:SetText(t.short or t.label)
+    self.tokens = {}
+    local SLOTS = math.max(10, #Shell.TABS)
+    local step = math.min(51, math.floor((WIN_W - 80) / (SLOTS - 1)))
+    local x0 = math.floor(WIN_W / 2 - step * (SLOTS - 1) / 2)
+    for i = 1, SLOTS do
+        local t = Shell.TABS[i]
+        local b = CreateFrame("Button", nil, f)
+        b:SetSize(40, 40)
+        b:SetPoint("CENTER", f, "TOPLEFT", x0 + (i - 1) * step, -101)
+        b:SetFrameLevel(tb:GetFrameLevel() + 4)
+        -- a golden halo behind the token of the room you are in
+        b.ring = b:CreateTexture(nil, "BACKGROUND")
+        b.ring:SetTexture(W.TAVERN .. "candle_glow")
+        b.ring:SetBlendMode("ADD")
+        b.ring:SetPoint("CENTER")
+        b.ring:SetSize(74, 74)
+        b.ring:Hide()
         b.icon = b:CreateTexture(nil, "ARTWORK")
-        b.icon:SetSize(16, 16)
-        b.icon:SetPoint("LEFT", 8, 0)
-        b.icon:SetTexture(t.icon)
-        if t.fullIcon then b.icon:SetTexCoord(0, 1, 0, 1); b.icon:SetSize(18, 18) else b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
-        b.dot = W.Tex(b, "OVERLAY", "circle")
-        b.dot:SetSize(7, 7)
-        b.dot:SetPoint("RIGHT", -10, 0)
-        b.dot:SetVertexColor(COLORS.accent[1], COLORS.accent[2], COLORS.accent[3])
+        b.icon:SetPoint("CENTER")
+        b.icon:SetTexture(W.TAVERN .. (t and t.tok or "tok_empty"))
+        b.rim = b:CreateTexture(nil, "OVERLAY")
+        b.rim:SetTexture(W.TAVERN .. "tav_ring")
+        b.rim:SetBlendMode("ADD")
+        b.rim:SetPoint("CENTER")
+        b.rim:Hide()
+        -- a wax seal on the rim while today's daily is still open
+        b.dot = b:CreateTexture(nil, "OVERLAY", nil, 2)
+        b.dot:SetTexture(W.TAVERN .. "tav_seal_daily")
+        b.dot:SetSize(17, 17)
+        b.dot:SetPoint("CENTER", b, "CENTER", 13, 12)
         b.dot:Hide()
-        b:SetScript("OnClick", function() self:SelectTab(t.key) end)
-        self.tabButtons[t.key] = b
-        x = x + tabW + gap
+        b.cur, b.want = 36, 36
+        b.icon:SetSize(36, 36)
+        b:SetScript("OnEnter", function(btn)
+            btn.over = true
+            if not GameTooltip then return end
+            GameTooltip:SetOwner(btn, "ANCHOR_BOTTOM", 0, -4)
+            if t then
+                GameTooltip:SetText(t.full or t.label, 1, 0.82, 0.38)
+                if t.tip then GameTooltip:AddLine(t.tip, 1, 1, 1, true) end
+                if btn.dot:IsShown() then GameTooltip:AddLine("Today's daily is waiting", 0.62, 0.88, 0.54) end
+            else
+                GameTooltip:SetText("An empty hook", 1, 0.82, 0.38)
+                GameTooltip:AddLine("More games are on the way.", 1, 1, 1)
+            end
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function(btn) btn.over = false; if GameTooltip then GameTooltip:Hide() end end)
+        if t then
+            b:SetScript("OnClick", function() W.SFX("pop2"); self:SelectTab(t.key) end)
+            self.tabButtons[t.key] = b
+        else
+            b.icon:SetVertexColor(0.85, 0.8, 0.74)
+            b.empty = true
+        end
+        self.tokens[i] = b
     end
 
     -- content host; each game builds a 520x712 frame inside the cabinet screen
@@ -260,10 +290,19 @@ function Shell:SelectTab(key)
     if m.OnShow then m:OnShow() end
     for k, b in pairs(self.tabButtons) do
         local on = k == key
-        b:SetStyle(on and "tabOn" or "tab")
-        b.icon:SetDesaturated(not on)
-        b.icon:SetAlpha(on and 1 or 0.7)
+        b.on = on
+        b.ring:SetShown(on)
+        b.rim:SetShown(on)
+        local v = on and 1 or 0.86
+        b.icon:SetVertexColor(v, v, v)
     end
+    -- the sign names the room you are in
+    if self.signSub then
+        local label = "TAVERN  GAMES"
+        for _, t in ipairs(Shell.TABS) do if t.key == key and key ~= "home" then label = (t.full or t.label):upper() end end
+        self.signSub:SetText(label)
+    end
+    if key ~= "home" then self.db.lastGame = key end
     self:RefreshDots()
 end
 
@@ -327,6 +366,21 @@ function Shell:OnUpdate(el)
         local t = self.bulbT * (6 + i) + i * 2
         local k = still and 0.8 or (0.72 + 0.12 * math.sin(t) + 0.08 * math.sin(t * 2.7 + 1) + 0.06 * math.sin(t * 5.3))
         g:SetAlpha(k)
+    end
+    -- tokens swell when chosen or pointed at; the chosen one keeps a slow golden pulse
+    for _, b in ipairs(self.tokens or {}) do
+        local want = b.empty and (b.over and 34 or 30) or (b.on and 42 or (b.over and 40 or 36))
+        if b.cur ~= want then
+            local d = want - b.cur
+            b.cur = (still or math.abs(d) < 0.3) and want or (b.cur + d * math.min(1, el * 16))
+            b.icon:SetSize(b.cur, b.cur)
+        end
+        if b.on then
+            local k = still and 0.5 or (0.5 + 0.2 * math.sin(self.bulbT * 2.6))
+            b.ring:SetAlpha(k)
+            b.rim:SetSize(b.cur + 3, b.cur + 3)
+            b.rim:SetAlpha(still and 0.35 or (0.3 + 0.25 * math.sin(self.bulbT * 2.6)))
+        end
     end
     -- landing countdown
     local o = self.card:IsShown() and self.card.opts

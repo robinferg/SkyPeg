@@ -1,6 +1,6 @@
 # Flight Buddy
 
-A tavern full of minigames for your World of Warcraft flight paths: Rune Breaker, Gryphon Greens mini golf (with live Versus), Featherbeard, High Tinker Pinball and Jewelcrafter's Bench.
+A tavern full of minigames for your World of Warcraft flight paths: Rune Breaker, Gryphon Greens mini golf (with live Versus), Featherbeard, High Tinker Pinball, Jewelcrafter's Bench and Death Roll.
 
 The addon itself is the `FlightBuddy` folder; its own README is inside it.
 

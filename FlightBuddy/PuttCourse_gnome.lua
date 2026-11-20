@@ -621,7 +621,7 @@ NS.PuttCourses.gnome = { key = "gnome", name = "Tinker Town", holes = {
         cup = { 125, 77 },
         bumpers = {  },
         portals = {  },
-        extra = { coins = { { 46, 300 } } },
+        extra = { coins = { { 53, 303 } } },
         ramps = {  },
         cannons = {  },
         movers = {  },

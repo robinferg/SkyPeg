@@ -611,6 +611,42 @@ function UI:RenderHole()
                 end
             end
         end
+        -- a strip narrower than that lattice would get no arrows at all and read as a blank patch:
+        -- walk it on a fine grid and drop arrows wherever none is near
+        for y = 9, P.H - 9, 4 do
+            for x = 9, P.W - 9, 4 do
+                local ch = Putt.Cell(h, x, y)
+                local ter = ch and Putt.TERRAIN[ch]
+                local dir = ter and (ter.slope or ter.boost)
+                if dir and Putt.Cell(h, x - 7, y - 7) == ch and Putt.Cell(h, x + 7, y + 7) == ch
+                    and Putt.Cell(h, x + 7, y - 7) == ch and Putt.Cell(h, x - 7, y + 7) == ch then
+                    local free = true
+                    for _, q in ipairs(h.patches or {}) do
+                        if x >= q.x1 and x <= q.x2 and y >= q.y1 and y <= q.y2 then free = false end
+                    end
+                    for _, f in ipairs(self.flow) do
+                        if abs(f.x - x) < 22 and abs(f.y - y) < 22 then free = false; break end
+                    end
+                    if free then
+                        arrowN = arrowN + 1
+                        local a = self.arrows[arrowN]
+                        if not a then a = cv:CreateTexture(nil, "BACKGROUND", nil, -4); self.arrows[arrowN] = a end
+                        a:SetDrawLayer("ARTWORK", -2)
+                        a:ClearAllPoints()
+                        a:SetSize(ter.boost and 20 or 18, ter.boost and 20 or 18)
+                        a:SetPoint("CENTER", cv, "TOPLEFT", x, -y)
+                        if a.SetRotation then a:SetRotation(-atan2(dir[1], -dir[2])) end
+                        if ter.boost then
+                            a:SetTexture(W.MEDIA .. "t_boost"); a:SetVertexColor(1, 0.9, 0.4, 0.85)
+                        else
+                            a:SetTexture(W.MEDIA .. "t_chevron"); a:SetVertexColor(1, 1, 1, 1)
+                        end
+                        a:Show()
+                        self.flow[#self.flow + 1] = { t = a, x = x, y = y, ph = (x * dir[1] + y * dir[2]) / 26, boost = ter.boost }
+                    end
+                end
+            end
+        end
     else
         self.flow = nil
     end
@@ -1366,6 +1402,10 @@ function E:washed(a)
     self:Burst(a.x, a.y, { 0.45, 0.75, 1 }, 18, 130)
     W.SFX("splash", 0.2)
     self:Hint("The tide washed your ball out")
+end
+
+function E:gust(f)
+    self:Hint("The fan blew your ball away")
 end
 
 function E:wisp(p, imp)

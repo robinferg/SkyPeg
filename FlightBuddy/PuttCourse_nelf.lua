@@ -620,7 +620,7 @@ NS.PuttCourses.nelf = { key = "nelf", name = "Teldrassil", holes = {
         tee = { 74, 412 },
         cup = { 402, 411 },
         bumpers = {  },
-        portals = { { ax = 117, ay = 334, bx = 352, by = 334, r = 9, dx = 1, dy = 0.3, adx = -1, ady = 0.3, exit = 300 } },
+        portals = { { ax = 102, ay = 334, bx = 373, by = 334, r = 9, dx = 1, dy = 0.3, adx = -1, ady = 0.3, exit = 300 } },
         extra = { coins = { { 238, 150 } } },
         ramps = {  },
         cannons = {  },

@@ -92,6 +92,8 @@ function UI:Build(parent)
     self.bestText:SetTextColor(COLORS.gold[1], COLORS.gold[2], COLORS.gold[3])
     self.rankText = W.Text(hud, 11, W.FONT)
     self.rankText:SetPoint("TOPLEFT", 2, -8)
+    self.rankText:SetWidth(156)          -- two short lines, clear of the title in the middle
+    self.rankText:SetJustifyH("LEFT")
     self.rankText:SetTextColor(COLORS.dim[1], COLORS.dim[2], COLORS.dim[3])
 
     -- the sky
@@ -394,7 +396,7 @@ function UI:Refresh()
     end
     local stars = db.quests.stars or 0
     local rank, nextAt = Flap.Rank(stars)
-    self.rankText:SetText(("%s  |cffffcc40%d|r stars%s"):format(rank, stars, nextAt and ("  (next rank at " .. nextAt .. ")") or ""))
+    self.rankText:SetText(("%s\n|cffffcc40%d|r stars%s"):format(rank, stars, nextAt and ("  (next rank at " .. nextAt .. ")") or ""))
     local playing = g and g.state ~= "ready"
     self.scoreText:SetText(playing and g.score or "")
     self.scoreShadow:SetText(playing and g.score or "")
