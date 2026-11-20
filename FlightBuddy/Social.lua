@@ -72,7 +72,22 @@ function Social.SecondsToReset()
     return 86400 - (t.hour * 3600 + t.min * 60 + t.sec)
 end
 
+---------------------------------------------------------------------------
+-- Names. A sender arrives as "First Last-Realm", where Realm is whatever the SERVER calls the realm.
+-- That is not always what GetNormalizedRealmName() says, and a name written that way cannot always be
+-- whispered back ("No player named ... is currently playing"). So: learn every spelling of our own
+-- realm from messages that can only come from it, write our own realm's players one way, whisper
+-- them by bare name, and never answer ourselves.
+---------------------------------------------------------------------------
 local function MyRealm() return (GetNormalizedRealmName and GetNormalizedRealmName()) or "" end
+local ourRealms = {}       -- other spellings of our own realm that we have seen on the wire
+
+local function Split(full)
+    local n, r = full:match("^(.+)%-([^%-]+)$")
+    if n then return n, r end
+    return full, nil
+end
+local function OurRealm(r) return r ~= nil and (r == MyRealm() or ourRealms[r] == true) end
 
 function Social.Me()
     local name = UnitName("player") or "?"
@@ -80,15 +95,79 @@ function Social.Me()
     return realm ~= "" and (name .. "-" .. realm) or name
 end
 
--- senders arrive as "Name-Realm" or, from your own realm on some clients, just "Name":
--- always store and compare the full form so nobody (you included) appears twice
+-- The one way a player is written here: "Name-Realm", and for our own realm always the same spelling,
+-- so nobody (you included) appears twice.
 local function Full(name)
     if type(name) ~= "string" or name == "" then return name end
-    if name:find("-", 1, true) then return name end
+    local n, r = Split(name)
     local realm = MyRealm()
-    return realm ~= "" and (name .. "-" .. realm) or name
+    if not r then return realm ~= "" and (name .. "-" .. realm) or name end
+    if OurRealm(r) then return realm ~= "" and (n .. "-" .. realm) or n end
+    return name
 end
 Social.Full = Full
+Social.Canon = Full
+
+-- who to whisper: players on our own realm go by bare name
+function Social.Target(name)
+    if type(name) ~= "string" or name == "" then return name end
+    local n, r = Split(Full(name))
+    if r and r == MyRealm() then return n end
+    return r and (n .. "-" .. r) or n
+end
+
+function Social.IsMe(name) return type(name) == "string" and Full(name) == Social.Me() end
+
+-- Another spelling of our own realm. Stored results heard under it are re-keyed on the next pump.
+function Social.LearnRealm(r)
+    if type(r) ~= "string" or r == "" or OurRealm(r) then return end
+    ourRealms[r] = true
+    local db = Social.db
+    if db then
+        local key = (GetRealmName and GetRealmName()) or "?"
+        db.realmNames = db.realmNames or {}
+        db.realmNames[key] = db.realmNames[key] or {}
+        db.realmNames[key][r] = true
+    end
+    Social.needTidy = true
+end
+
+-- Our own messages come back to us on shared channels, signed the way the server writes us: that
+-- is how the server's spelling of our realm is learned. (Only our own echo is trusted for this; a
+-- guild or a group can hold players from other realms.)
+local ECHO = { GUILD = true, PARTY = true, RAID = true, CHANNEL = true, INSTANCE_CHAT = true, OFFICER = true }
+function Social.Hear(channel, sender)
+    if type(sender) ~= "string" or not ECHO[channel] then return end
+    local n, r = Split(sender)
+    if not r or OurRealm(r) then return end
+    if n == (UnitName and UnitName("player")) then Social.LearnRealm(r) end
+end
+
+-- Every addon message Flight Buddy sends goes through here: whispers go to a name the server can
+-- find, never to ourselves, and are remembered briefly so a "no player named" reply for one of
+-- them (they logged off a moment ago) is kept out of the chat window.
+local whispered = {}
+function Social.Deliver(prefix, text, chatType, target)
+    if chatType == "WHISPER" then
+        if type(target) ~= "string" or target == "" or Social.IsMe(target) then return end
+        target = Social.Target(target)
+        whispered[target:lower()] = (GetTime and GetTime()) or 0
+    end
+    if C_ChatInfo and C_ChatInfo.SendAddonMessage then pcall(C_ChatInfo.SendAddonMessage, prefix, text, chatType, target) end
+end
+
+local function QuietFilter()
+    if Social.filtered or not ChatFrame_AddMessageEventFilter or type(ERR_CHAT_PLAYER_NOT_FOUND_S) ~= "string" then return end
+    Social.filtered = true
+    local pat = "^" .. ERR_CHAT_PLAYER_NOT_FOUND_S:gsub("([%^%$%(%)%.%[%]%*%+%-%?])", "%%%1"):gsub("%%s", "(.+)") .. "$"
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", function(_, _, msg)
+        if type(msg) ~= "string" then return false end
+        local who = msg:match(pat)
+        local at = who and (whispered[who:lower()] or whispered[Social.Target(who):lower()])
+        if at and ((GetTime and GetTime()) or 0) - at < 8 then return true end
+        return false
+    end)
+end
 
 local function Short(full)
     if Ambiguate then return Ambiguate(full, "none") end
@@ -110,6 +189,34 @@ function Social:Init(db)
         C_ChatInfo.RegisterAddonMessagePrefix(PREFIX)
     end
     self.joinAt = 12   -- join the realm channel a little after login, once chat is ready
+    local known = db.realmNames and db.realmNames[(GetRealmName and GetRealmName()) or "?"]
+    for r in pairs(known or {}) do ourRealms[r] = true end
+    QuietFilter()
+    self:Tidy()
+end
+
+-- Results stored under another spelling of our realm are moved to the one spelling we use; any that
+-- turn out to be our own echo are dropped (we already hold our own results).
+function Social:Tidy()
+    Social.needTidy = nil
+    if NS.DeathRoll and NS.DeathRoll.TidyNames then NS.DeathRoll:TidyNames() end
+    local me = Social.Me()
+    for game, days in pairs(self.db.boards or {}) do
+        for _, entries in pairs(days) do
+            local moves
+            for who in pairs(entries) do
+                if type(who) == "string" and Full(who) ~= who then moves = moves or {}; moves[#moves + 1] = who end
+            end
+            for _, who in ipairs(moves or {}) do
+                local e, to = entries[who], Full(who)
+                entries[who] = nil
+                if to ~= me and (not entries[to] or (type(e) == "table" and type(entries[to]) == "table"
+                    and ((GAMES[game] == "high" and e.s > entries[to].s) or (GAMES[game] ~= "high" and e.s < entries[to].s)))) then
+                    entries[to] = e
+                end
+            end
+        end
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -173,13 +280,12 @@ function Social:Pump(el)
         self.joinAt = self.joinAt - el
         if self.joinAt <= 0 then self.joinAt = nil; self:JoinRealm() end
     end
+    if Social.needTidy then self:Tidy() end
     sendAcc = sendAcc + el
     if sendAcc < 0.3 or #queue == 0 then return end
     sendAcc = 0
     local m = table.remove(queue, 1)
-    if C_ChatInfo and C_ChatInfo.SendAddonMessage then
-        pcall(C_ChatInfo.SendAddonMessage, PREFIX, m[1], m[2], m[3])
-    end
+    Social.Deliver(PREFIX, m[1], m[2], m[3])
 end
 
 local function Better(game, a, b)   -- is score a better than b?
@@ -262,6 +368,7 @@ function Social:OnMessage(prefix, text, channel, sender)
         if not s or s < 0 or s > 1e9 or channel ~= "WHISPER" then return end
         -- names can have a space ("First Last-Realm"); realms are sent without spaces
         if type(name) ~= "string" or #name > 48 or not name:match("^[^%-;]+%-[^%s;%-]+$") then return end
+        name = Full(name)
         if name == Social.Me() or name == sender then return end
         self:Store(game, day, name, s, (detail or ""):sub(1, 24), "realm", true)
     elseif kind == "Q" then

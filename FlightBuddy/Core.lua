@@ -191,6 +191,7 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
         end
     elseif event == "CHAT_MSG_ADDON" then
         if NS.db then
+            NS.Social.Hear(a3, a4)
             NS.Social:OnMessage(a1, a2, a3, a4)
             if NS.Versus then NS.Versus:OnMessage(a1, a2, a3, a4) end
             if NS.DeathRoll then NS.DeathRoll:OnMessage(a1, a2, a3, a4) end

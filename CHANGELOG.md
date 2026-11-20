@@ -5,6 +5,8 @@
 - **Tavern: the games are much easier to see.** Three large cabinets to a row with each game's name on a big brass plate and your progress written beneath; the shelf is gone and the wall behind is darker so the games stand out
 - Larger writing on the marquee, the chalkboard, the notice board and the keeper's scroll
 - Pointing at a cabinet shows it on the marquee; games still being built wait on a second floor under their dust sheets
+- **Fixed:** "No player named ... is currently playing" appearing in chat after loading screens. Flight Buddy was answering its own score request with a whisper the server could not deliver
+- **Fixed:** Versus and Death Roll invites, accepts and score replies between players now reach each other on realms where the server writes the realm name differently from the game; players are whispered by name, and each player appears once on the boards and in the Death Roll ledger
 
 ## 2.1.0
 - **Death Roll:** a new game. Challenge anyone to a one-on-one death roll for gold, like a duel request, from the Roll tab or `/deathroll Name 50`. Rolls use the real `/roll`, every roll plays out as a blow in the Brawler's Pit, the loser can go double or nothing, and guildmates and groupmates with Flight Buddy can watch the play-by-play

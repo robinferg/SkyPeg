@@ -19,17 +19,15 @@ local queue, sendAcc = {}, 0
 ---------------------------------------------------------------------------
 -- Names
 ---------------------------------------------------------------------------
+-- names are written and whispered the one way Social does it (see "Names" in Social.lua)
 local function MyRealm() return (GetNormalizedRealmName and GetNormalizedRealmName()) or "" end
 local function Norm(name)
     if type(name) ~= "string" or name == "" then return nil end
-    if not name:find("-", 1, true) then name = name .. "-" .. MyRealm() end
-    return name
+    return NS.Social.Canon(name)
 end
 local function Short(full)
     if not full then return "?" end
-    local n, r = full:match("^([^-]+)-(.+)$")
-    if n and r == MyRealm() then return n end
-    return full
+    return NS.Social.Target(full)
 end
 V.Short = Short
 local function MeName()
@@ -527,7 +525,7 @@ function V:Pump(el)
     if sendAcc >= 0.12 and #queue > 0 then
         sendAcc = 0
         local q = table.remove(queue, 1)
-        if C_ChatInfo and C_ChatInfo.SendAddonMessage then pcall(C_ChatInfo.SendAddonMessage, PREFIX, q[1], q[2], q[3]) end
+        NS.Social.Deliver(PREFIX, q[1], q[2], q[3])
     end
     if self.invite and GetTime() - self.invite.at > INVITE_SECS then self.invite = nil end
     local m = self.match

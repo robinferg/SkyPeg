@@ -19,17 +19,15 @@ local queue, sendAcc = {}, 0
 ---------------------------------------------------------------------------
 -- Names
 ---------------------------------------------------------------------------
+-- names are written and whispered the one way Social does it (see "Names" in Social.lua)
 local function MyRealm() return (GetNormalizedRealmName and GetNormalizedRealmName()) or "" end
 local function Norm(name)
     if type(name) ~= "string" or name == "" then return nil end
-    if not name:find("-", 1, true) then name = name .. "-" .. MyRealm() end
-    return name
+    return NS.Social.Canon(name)
 end
 local function Short(full)
     if not full then return "?" end
-    local n, r = full:match("^(.+)-([^-]+)$")
-    if n and r == MyRealm() then return n end
-    return full
+    return NS.Social.Target(full)
 end
 local function Key(name) name = Norm(name); return name and name:lower() end
 local function MeName() return Norm((UnitName and UnitName("player")) or "Player") end
@@ -68,6 +66,7 @@ function D:Init(db)
     if s.notify == nil then s.notify = true end
     if s.start == nil then s.start = 1000 end
     self.db = s
+    self:TidyNames()
     self.watch = {}
     if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then C_ChatInfo.RegisterAddonMessagePrefix(PREFIX) end
     -- "%s rolls %d (%d-%d)" in the client's own language, turned into a pattern
@@ -200,6 +199,23 @@ end
 ---------------------------------------------------------------------------
 -- Ledger and record
 ---------------------------------------------------------------------------
+-- one player, one line: debts filed under another spelling of our realm are added to the one we use
+function D:TidyNames()
+    local led = self.db and self.db.ledger
+    if not led then return end
+    local moves
+    for key, e in pairs(led) do
+        local to = type(e) == "table" and e.name and Key(e.name)
+        if to and to ~= key then moves = moves or {}; moves[#moves + 1] = { key, to } end
+    end
+    for _, m in ipairs(moves or {}) do
+        local e = led[m[1]]
+        led[m[1]] = nil
+        e.name = Norm(e.name)
+        if led[m[2]] then led[m[2]].owe = (led[m[2]].owe or 0) + (e.owe or 0) else led[m[2]] = e end
+    end
+end
+
 function D:Entry(full)
     local key = Key(full)
     local e = self.db.ledger[key]
@@ -631,7 +647,7 @@ function D:Pump(el)
     if sendAcc >= 0.12 and #queue > 0 then
         sendAcc = 0
         local q = table.remove(queue, 1)
-        if C_ChatInfo and C_ChatInfo.SendAddonMessage then pcall(C_ChatInfo.SendAddonMessage, PREFIX, q[1], q[2], q[3]) end
+        NS.Social.Deliver(PREFIX, q[1], q[2], q[3])
     end
     local now = GetTime()
     if self.trade and self.trade.closedAt and now - self.trade.closedAt > 3 then self.trade = nil end
