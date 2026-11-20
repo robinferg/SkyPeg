@@ -14,6 +14,18 @@ local UI = {}
 NS.Home = UI
 
 local FW, FH = 520, 674                 -- the room (the cabinet screen below the token row)
+-- The room from the top: the keeper and the marquee (146 high), the cabinet floor (two rows of three,
+-- as large as the width allows), then the chalkboard, the notice board and your plaque side by side.
+local MQ_W, MQ_H = 400, 132
+local MQ_X, MQ_Y = 112, 14
+local FLOOR_Y = 150
+local CAB_W = 170                       -- three cabinets to a row
+local CAB_FULL = 250                    -- the cabinet picture's full height at that width
+local CAB_CUT = 0.73                    -- drawn down to the control shelf; the base is left off to make room
+local CAB_H = math.floor(CAB_FULL * CAB_CUT + 0.5)
+local TILE_H = CAB_H + 16               -- a cabinet and the line of writing beneath it
+local BOARD_Y, BOARD_W, BOARD_H = 550, 208, 118
+local PL_W, PL_H = 80, 118
 local INK = { 0.20, 0.12, 0.05 }        -- writing on parchment and brass
 local NAME = "|cff7a2a0c"               -- names written on parchment
 
@@ -35,7 +47,7 @@ UI.GAMES = {
 }
 -- games still being built: they stand on the floor under dust sheets
 UI.SOON = { "Deeprun Tram Runner", "Azeroth Trivia", "Goblin Minefield" }
-UI.PER_PAGE = 8
+UI.PER_PAGE = 6
 
 local function Today() return NS.Social and NS.Social.Today() or (date and date("%Y%m%d")) or "" end
 local function Still() return NS.db and NS.db.settings and NS.db.settings.reducedMotion end
@@ -71,17 +83,14 @@ function UI:Build(parent)
     f:Hide()
     self.t = 0
 
-    -- the back wall of the game hall: timber, a shelf of mugs and trophies, two lanterns, a carpet runner
+    -- the back wall of the game hall: only the plain planks below its shelf, dimmed, so nothing
+    -- behind the games competes with them
     local wall = f:CreateTexture(nil, "BACKGROUND", nil, -8)
     wall:SetTexture(T .. "tav_wall")
     wall:SetAllPoints()
-    wall:SetTexCoord(0, 1, 0, FH / (FW / 0.75))
-    self.lamps = {}
-    for i, x in ipairs({ 44, 476 }) do
-        local g = Glow(f, "BACKGROUND", 170, 1, 0.82, 0.55, -6)
-        g:SetPoint("CENTER", f, "TOPLEFT", x, -74)
-        self.lamps[i] = g
-    end
+    wall:SetTexCoord(0.06, 0.94, 0.30, 0.985)
+    local dim = W.Solid(f, "BACKGROUND", 0, 0, 0, 0.42, -7)
+    dim:SetAllPoints()
 
     self:BuildMarquee(f)
     self:BuildPlaque(f)
@@ -100,7 +109,7 @@ UI.HOST = "Pim Tokenspring"
 function UI:BuildHost(f)
     local h = CreateFrame("Button", nil, f)
     h:SetSize(104, 112)
-    h:SetPoint("TOPLEFT", f, "TOPLEFT", 2, -2)
+    h:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -(MQ_Y + MQ_H - 112))
     h:SetFrameLevel(f:GetFrameLevel() + 16)
     h.tex = h:CreateTexture(nil, "ARTWORK")
     h.tex:SetSize(118, 118)
@@ -114,20 +123,20 @@ function UI:BuildHost(f)
     self.host = h
     self.pose = "wave"
 
-    -- her words: a parchment scroll that unrolls over the shelf while she talks
+    -- her words: a parchment scroll that unrolls beside her, over the sign's row of bulbs
     local b = CreateFrame("Frame", nil, f)
-    b:SetSize(304, 67)
-    b:SetPoint("TOPLEFT", f, "TOPLEFT", 110, -20)
+    b:SetSize(308, 64)
+    b:SetPoint("TOPLEFT", f, "TOPLEFT", 96, 0)
     b:SetFrameLevel(f:GetFrameLevel() + 18)
     local bt = b:CreateTexture(nil, "ARTWORK")
     bt:SetTexture(T .. "tav_bubble")
     bt:SetAllPoints()
-    b.text = W.Text(b, 11, W.FONT)
-    b.text:SetPoint("TOPLEFT", 32, -9)
-    b.text:SetPoint("BOTTOMRIGHT", -40, 9)
+    b.text = W.Text(b, 12, W.FONT)
+    b.text:SetPoint("TOPLEFT", 32, -8)
+    b.text:SetPoint("BOTTOMRIGHT", -40, 8)
     b.text:SetJustifyH("LEFT")
     if b.text.SetJustifyV then b.text:SetJustifyV("MIDDLE") end
-    if b.text.SetSpacing then b.text:SetSpacing(2) end
+    if b.text.SetSpacing then b.text:SetSpacing(1) end
     b.text:SetTextColor(INK[1], INK[2], INK[3])
     b.text:SetShadowColor(0, 0, 0, 0)
     b:SetAlpha(0)
@@ -141,7 +150,6 @@ function UI:Pose(pose)
     if self.pose == pose then return end
     self.pose = pose
     self.host.tex:SetTexture(T .. "tav_host_" .. pose)
-    self.hop = 1
 end
 
 -- hold: seconds to keep the scroll open (nil = until Hush)
@@ -218,8 +226,6 @@ end
 -- The marquee: one featured game with one big PLAY button. It shows this flight's round while you
 -- fly, then today's open dailies, then the game you played last; point at a cabinet to preview it.
 ---------------------------------------------------------------------------
-local MQ_W, MQ_H = 400, 132
-local MQ_X, MQ_Y = 14, 106
 local MQ_WIN = { 0.1014, 0.8986, 0.3673, 0.8883 }     -- the cut-out in the sign (left, right, top, bottom)
 local MQ_BULBS = { 0.212, 0.356, 0.500, 0.644, 0.788 }
 
@@ -252,16 +258,16 @@ function UI:BuildMarquee(f)
     fade:SetPoint("TOPLEFT", m.art, "TOPLEFT", -1, 0)
     fade:SetPoint("BOTTOMLEFT", m.art, "BOTTOMLEFT", -1, 0)
     fade:SetWidth(96)
-    m.kicker = W.Text(body, 9, W.FONT)
-    m.kicker:SetPoint("TOPLEFT", 10, -6)
+    m.kicker = W.Text(body, 10, W.FONT)
+    m.kicker:SetPoint("TOPLEFT", 10, -5)
     m.kicker:SetTextColor(COLORS.accent[1], COLORS.accent[2], COLORS.accent[3])
-    m.title = W.Text(body, 17, W.FONT_TITLE)
-    m.title:SetPoint("TOPLEFT", 10, -18)
+    m.title = W.Text(body, 20, W.FONT_TITLE)
+    m.title:SetPoint("TOPLEFT", 10, -17)
     m.title:SetWidth(sw - 96)
     m.title:SetJustifyH("LEFT")
     if m.title.SetWordWrap then m.title:SetWordWrap(false) end
     m.title:SetTextColor(1, 0.90, 0.62)
-    m.sub = W.Text(body, 10, W.FONT)
+    m.sub = W.Text(body, 11, W.FONT)
     m.sub:SetPoint("TOPLEFT", 10, -40)
     m.sub:SetWidth(sw - 92)
     m.sub:SetJustifyH("LEFT")
@@ -302,7 +308,7 @@ function UI:BuildMarquee(f)
     m.shine:SetPoint("BOTTOMRIGHT", over, "TOPLEFT", x1 + 30, -(y1 + 30))
     m.shine:SetAlpha(0)
 
-    m.play = W.Button(m, 64, 26, "PLAY", "primary")
+    m.play = W.Button(m, 72, 28, "PLAY", "primary")
     m.play:SetPoint("BOTTOMRIGHT", m, "TOPLEFT", x1 - 8, -(y1 - 7))
     m.play:SetFrameLevel(m:GetFrameLevel() + 4)
     m.play:SetScript("OnClick", function() self:PlayFeature() end)
@@ -322,7 +328,7 @@ function UI:Features()
     for _, it in ipairs(self:Specials()) do
         local g = GameByKey(it.key)
         if it.kind == "flight" then
-            out[#out + 1] = { id = "flight", kicker = "THIS FLIGHT", title = it.text, game = g, go = it.go,
+            out[#out + 1] = { id = "flight", kicker = "THIS FLIGHT  -  FROM " .. tostring(it.from):upper(), title = "To " .. tostring(it.to), game = g, go = it.go,
                 sub = ("A %d-hole round of golf made for this route"):format(it.holes) }
         elseif it.kind == "daily" and not it.done then
             out[#out + 1] = { id = "daily-" .. it.key, kicker = "TODAY'S DAILY  -  " .. g.name:upper(), title = it.title or it.text, game = g, go = it.go, sub = it.blurb }
@@ -342,8 +348,7 @@ function UI:Features()
 end
 
 function UI:GameFeature(g)
-    local stat = self:CardStat(g)
-    return { id = "game-" .. g.key, kicker = "NOW SHOWING", title = g.name, game = g, sub = stat ~= "" and stat or g.tag,
+    return { id = "game-" .. g.key, kicker = "NOW SHOWING", title = g.name, game = g, sub = g.tag,
         go = function() NS.Shell:SelectTab(g.key) end, preview = true }
 end
 
@@ -360,7 +365,7 @@ function UI:ApplyFeature(ft)
     for i, p in ipairs(m.pips) do
         if n > 1 and i <= n then
             p:ClearAllPoints()
-            p:SetPoint("BOTTOMLEFT", m.body, "BOTTOMLEFT", 11 + (i - 1) * 10, 5)
+            p:SetPoint("BOTTOMLEFT", m.body, "BOTTOMLEFT", 11 + (i - 1) * 10, 3)
             local on = self.features[i] and self.features[i].id == ft.id
             if on then p:SetVertexColor(1, 0.86, 0.45, 1) else p:SetVertexColor(0.75, 0.62, 0.42, 0.45) end
             p:Show()
@@ -431,14 +436,13 @@ function UI:PatronTitle()
     return title, n, nextAt, nextTitle
 end
 
-local PL_W, PL_H = 84, 124
 local PL_WIN = { 0.2059, 0.79, 0.1671, 0.5635 }
-local XP_W, XP_H = 62, 7
+local XP_W, XP_H = 60, 7
 
 function UI:BuildPlaque(f)
     local p = CreateFrame("Button", nil, f)
     p:SetSize(PL_W, PL_H)
-    p:SetPoint("TOPLEFT", f, "TOPLEFT", 424, -110)
+    p:SetPoint("TOPLEFT", f, "TOPLEFT", 434, -BOARD_Y)
     p:SetFrameLevel(f:GetFrameLevel() + 2)
     self.plaque = p
     local cx = (PL_WIN[1] + PL_WIN[2]) / 2 * PL_W
@@ -463,19 +467,19 @@ function UI:BuildPlaque(f)
     p.ring:SetPoint("CENTER", p, "TOPLEFT", cx, -cy)
     p.ring:SetAlpha(0)
     self.patronName = W.Text(p, 11, W.FONT_TITLE)
-    self.patronName:SetPoint("TOP", p, "TOP", 0, -71)
+    self.patronName:SetPoint("TOP", p, "TOP", 0, -68)
     self.patronName:SetWidth(PL_W - 12)
     if self.patronName.SetWordWrap then self.patronName:SetWordWrap(false) end
     self.patronName:SetTextColor(COLORS.gold[1], COLORS.gold[2], COLORS.gold[3])
     self.patronTitle = W.Text(p, 9, W.FONT)
-    self.patronTitle:SetPoint("TOP", p, "TOP", 0, -84)
+    self.patronTitle:SetPoint("TOP", p, "TOP", 0, -81)
     self.patronTitle:SetWidth(PL_W - 10)
     if self.patronTitle.SetWordWrap then self.patronTitle:SetWordWrap(false) end
     self.patronTitle:SetTextColor(COLORS.text[1], COLORS.text[2], COLORS.text[3])
     -- progress to the next title: a brass tube that fills with gold
     local xb = W.Solid(p, "OVERLAY", 0.07, 0.04, 0.02, 1, 1)
     xb:SetSize(XP_W - 6, XP_H - 3)
-    xb:SetPoint("CENTER", p, "TOP", 0, -101)
+    xb:SetPoint("CENTER", p, "TOP", 0, -97)
     self.patronBar = W.Solid(p, "OVERLAY", 1.0, 0.80, 0.30, 1, 2)
     self.patronBar:SetHeight(XP_H - 3)
     self.patronBar:SetPoint("LEFT", xb, "LEFT", 0, 0)
@@ -520,27 +524,26 @@ end
 ---------------------------------------------------------------------------
 -- The cabinet floor: every game is a dwarven arcade cabinet with its own picture on the screen
 ---------------------------------------------------------------------------
-local CAB_W, CAB_H = 102, 150
-local FLOOR_Y = 242
 local CAB_WIN = { 0.1635, 0.8355, 0.2462, 0.4917 }
 
 function UI:BuildFloor(f)
     self.slots = {}
     self.page = 1
-    local wx0, wx1, wy0, wy1 = CAB_WIN[1] * CAB_W, CAB_WIN[2] * CAB_W, CAB_WIN[3] * CAB_H, CAB_WIN[4] * CAB_H
+    local wx0, wx1 = CAB_WIN[1] * CAB_W, CAB_WIN[2] * CAB_W
+    local wy0, wy1 = CAB_WIN[3] * CAB_FULL, CAB_WIN[4] * CAB_FULL
     for i = 1, UI.PER_PAGE do
-        local col, row = (i - 1) % 4, floor((i - 1) / 4)
+        local col, row = (i - 1) % 3, floor((i - 1) / 3)
         local c = CreateFrame("Button", nil, f)
-        c:SetSize(CAB_W, CAB_H)
-        c:SetPoint("TOPLEFT", f, "TOPLEFT", 33 + col * 117, -(FLOOR_Y + row * 152))
+        c:SetSize(CAB_W, TILE_H)
+        c:SetPoint("TOPLEFT", f, "TOPLEFT", 5 + col * CAB_W, -(FLOOR_Y + row * TILE_H))
         c:SetFrameLevel(f:GetFrameLevel() + 3 + row * 4)
         c.phase = i * 1.7
-        -- the shadow it throws on the floorboards
+        -- the shadow it throws on the wall behind
         local sh = c:CreateTexture(nil, "BACKGROUND")
         sh:SetTexture(T .. "candle_glow")
-        sh:SetVertexColor(0, 0, 0, 0.7)
-        sh:SetSize(CAB_W + 26, 30)
-        sh:SetPoint("CENTER", c, "BOTTOM", 0, 5)
+        sh:SetVertexColor(0, 0, 0, 0.75)
+        sh:SetSize(CAB_W + 10, 34)
+        sh:SetPoint("CENTER", c, "TOP", 0, -(CAB_H - 4))
         -- everything that lifts when you point at it
         local b = CreateFrame("Frame", nil, c)
         b:SetSize(CAB_W, CAB_H)
@@ -557,39 +560,46 @@ function UI:BuildFloor(f)
         c.cab = b:CreateTexture(nil, "ARTWORK")
         c.cab:SetTexture(T .. "tav_cabinet")
         c.cab:SetAllPoints()
+        c.cab:SetTexCoord(0, 1, 0, CAB_CUT)
+        -- a game still being built stands whole under its dust sheet, a little smaller
         c.sheet = b:CreateTexture(nil, "ARTWORK")
         c.sheet:SetTexture(T .. "tav_cabinet_covered")
-        c.sheet:SetAllPoints()
-        -- screen glow, the lantern on the roof and the rune on the base
+        c.sheet:SetSize(floor(CAB_H * 0.69), CAB_H)
+        c.sheet:SetPoint("BOTTOM", b, "BOTTOM", 0, 0)
+        -- the screen's glow and the lantern on the roof, lit while you point at it
         c.screen = Glow(b, "OVERLAY", 10, 1, 0.9, 0.7)
         c.screen:ClearAllPoints()
-        c.screen:SetPoint("TOPLEFT", b, "TOPLEFT", wx0 - 16, -(wy0 - 14))
-        c.screen:SetPoint("BOTTOMRIGHT", b, "TOPLEFT", wx1 + 16, -(wy1 + 14))
-        c.lamp = Glow(b, "OVERLAY", 46, 1, 0.82, 0.5)
-        c.lamp:SetPoint("CENTER", b, "TOPLEFT", CAB_W * 0.5, -CAB_H * 0.105)
-        c.rune = Glow(b, "OVERLAY", 30, 0.35, 0.75, 1)
-        c.rune:SetPoint("CENTER", b, "TOPLEFT", CAB_W * 0.5, -CAB_H * 0.845)
-        -- the brass nameplate under the screen
+        c.screen:SetPoint("TOPLEFT", b, "TOPLEFT", wx0 - 22, -(wy0 - 20))
+        c.screen:SetPoint("BOTTOMRIGHT", b, "TOPLEFT", wx1 + 22, -(wy1 + 20))
+        c.lamp = Glow(b, "OVERLAY", 64, 1, 0.82, 0.5)
+        c.lamp:SetPoint("CENTER", b, "TOPLEFT", CAB_W * 0.5, -CAB_FULL * 0.105)
+        -- the game's name, large, on the brass plate under the screen
         local plate = CreateFrame("Frame", nil, b)
-        plate:SetSize(82, 15)
-        plate:SetPoint("CENTER", b, "TOPLEFT", CAB_W * 0.5, -CAB_H * 0.563)
+        plate:SetSize(150, 25)
+        plate:SetPoint("CENTER", b, "TOPLEFT", CAB_W * 0.5, -CAB_FULL * 0.566)
         plate:SetFrameLevel(c:GetFrameLevel() + 2)
-        W.Three(plate, T .. "btn_brass", 8, "ARTWORK", 1)
-        c.name = W.Text(plate, 10, W.FONT_NUM)
+        W.Three(plate, T .. "btn_brass", 12, "ARTWORK", 1)
+        c.name = W.Text(plate, 14, W.FONT_TITLE)
         c.name:SetPoint("CENTER", 0, 0)
-        c.name:SetTextColor(INK[1], INK[2], INK[3])
-        c.name:SetShadowColor(1, 0.92, 0.65, 0.35)
+        c.name:SetTextColor(0.13, 0.07, 0.02)
+        c.name:SetShadowColor(0, 0, 0, 0)
         c.plate = plate
         -- pinned to the roof: a wax seal (daily open / never played) and your rank ribbon
         local badges = CreateFrame("Frame", nil, b)
         badges:SetAllPoints()
         badges:SetFrameLevel(c:GetFrameLevel() + 2)
         c.seal = badges:CreateTexture(nil, "OVERLAY", nil, 3)
-        c.seal:SetSize(30, 30)
-        c.seal:SetPoint("CENTER", badges, "TOPLEFT", CAB_W - 13, -30)
+        c.seal:SetSize(38, 38)
+        c.seal:SetPoint("CENTER", badges, "TOPLEFT", CAB_W - 24, -40)
         c.ribbon = badges:CreateTexture(nil, "OVERLAY", nil, 3)
-        c.ribbon:SetSize(30, 30)
-        c.ribbon:SetPoint("CENTER", badges, "TOPLEFT", 13, -32)
+        c.ribbon:SetSize(38, 38)
+        c.ribbon:SetPoint("CENTER", badges, "TOPLEFT", 24, -42)
+        -- how you are doing at it, written beneath
+        c.cap = W.Text(c, 11, W.FONT)
+        c.cap:SetPoint("TOP", c, "TOP", 0, -(CAB_H + 1))
+        c.cap:SetWidth(CAB_W - 6)
+        if c.cap.SetWordWrap then c.cap:SetWordWrap(false) end
+        c.cap:SetTextColor(COLORS.text[1], COLORS.text[2], COLORS.text[3])
         c.lift, c.glow = 0, 0
         c:SetScript("OnEnter", function() self:CabinetEnter(c) end)
         c:SetScript("OnLeave", function() self:CabinetLeave(c) end)
@@ -597,12 +607,12 @@ function UI:BuildFloor(f)
         self.slots[i] = c
     end
 
-    -- signpost hands to walk along the floor when there are more than eight games
+    -- signpost hands to walk along the floor to the next six cabinets
     self.arrows = {}
     for i, dir in ipairs({ -1, 1 }) do
         local a = CreateFrame("Button", nil, f)
-        a:SetSize(30, 16)
-        a:SetPoint("CENTER", f, "TOPLEFT", dir < 0 and 17 or FW - 17, -(FLOOR_Y + 152))
+        a:SetSize(32, 17)     -- on the line of writing between the two rows, at the very edge of the floor
+        a:SetPoint("CENTER", f, "TOPLEFT", dir < 0 and 17 or FW - 17, -(FLOOR_Y + TILE_H - 8))
         a:SetFrameLevel(f:GetFrameLevel() + 12)
         a.tex = a:CreateTexture(nil, "ARTWORK")
         a.tex:SetTexture(T .. "tav_arrow")
@@ -611,19 +621,19 @@ function UI:BuildFloor(f)
         local hl = a:CreateTexture(nil, "HIGHLIGHT")
         hl:SetTexture(T .. "candle_glow")
         hl:SetBlendMode("ADD")
-        hl:SetSize(44, 44)
+        hl:SetSize(46, 46)
         hl:SetPoint("CENTER")
         a:SetScript("OnClick", function() W.SFX("pop2"); self:TurnPage(dir) end)
-        a:SetScript("OnEnter", function() self:Point(dir < 0 and "Back along the floor." or "More cabinets this way!", "point") end)
+        a:SetScript("OnEnter", function()
+            self:Point(("%s You're looking at floor %d of %d."):format(dir < 0 and "Back along the floor." or "More cabinets this way!", self.page, self:Pages()), "point")
+        end)
         a:SetScript("OnLeave", function() self:Unpoint() end)
         self.arrows[i] = a
     end
-    self.pageText = W.Text(f, 10, W.FONT)
-    self.pageText:SetPoint("CENTER", f, "TOPLEFT", FW - 17, -(FLOOR_Y + 168))
-    self.pageText:SetTextColor(COLORS.dim[1], COLORS.dim[2], COLORS.dim[3])
 end
 
-function UI:Pages() return max(1, ceil(#UI.GAMES / UI.PER_PAGE)) end
+-- the games, then the ones still under dust sheets, six to a page
+function UI:Pages() return max(1, ceil((#UI.GAMES + #UI.SOON) / UI.PER_PAGE)) end
 
 function UI:TurnPage(dir)
     local n = self:Pages()
@@ -637,26 +647,35 @@ function UI:FillFloor()
     local pages = self:Pages()
     if self.page > pages then self.page = 1 end
     local first = (self.page - 1) * UI.PER_PAGE
-    local soon = 0
     for i, c in ipairs(self.slots) do
-        local g = UI.GAMES[first + i]
+        local n = first + i
+        local g = UI.GAMES[n]
         c.game = g
-        c.soon = nil
+        c.soon = (not g) and UI.SOON[n - #UI.GAMES] or nil
         if g then
+            c:Show()
             c.cab:Show(); c.sheet:Hide(); c.art:Show(); c.back:Show(); c.plate:Show()
             c.art:SetTexture(T .. g.art)
             ArtWindow(c.art, c.artW, c.artH, g.tx, g.ty, g.tz)
             c.name:SetText(g.plate or g.name)
-        else
-            soon = soon + 1
-            c.soon = UI.SOON[(first + i - #UI.GAMES - 1) % #UI.SOON + 1]
+        elseif c.soon then
+            c:Show()
             c.cab:Hide(); c.sheet:Show(); c.art:Hide(); c.back:Hide(); c.plate:Hide()
             c.seal:Hide(); c.ribbon:Hide()
-            c.screen:SetAlpha(0); c.lamp:SetAlpha(0); c.rune:SetAlpha(0)
+            c.screen:SetAlpha(0); c.lamp:SetAlpha(0)
+            c.cap:SetText("|cffb5a585" .. c.soon .. "|r")
+        else
+            c:Hide()
         end
     end
+    local onPage = min(UI.PER_PAGE, #UI.GAMES + #UI.SOON - first)
+    local drop = onPage <= 3 and floor(TILE_H / 2) or 0
+    for i, c in ipairs(self.slots) do
+        local col, row = (i - 1) % 3, floor((i - 1) / 3)
+        c:ClearAllPoints()
+        c:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 5 + col * CAB_W, -(FLOOR_Y + row * TILE_H + drop))
+    end
     for _, a in ipairs(self.arrows) do a:SetShown(pages > 1) end
-    self.pageText:SetText(pages > 1 and ("%d/%d"):format(self.page, pages) or "")
 end
 
 function UI:Go(key)
@@ -667,13 +686,12 @@ end
 function UI:CabinetEnter(c)
     c.over = true
     if c.game then
-        local g = c.game
-        local stat = self:CardStat(g)
-        local line = ("%s%s|r  %s"):format(NAME, g.name, g.tag)
-        if stat and stat ~= "" then line = line .. "\n" .. stat end
-        if c.rankText then line = line .. "  -  " .. c.rankText end
-        self:Point(line, "point")
-        self.preview = self:GameFeature(g)
+        -- the marquee shows it large; the keeper keeps quiet so nothing covers the sign
+        local ft = self:GameFeature(c.game)
+        if c.rankText then ft.kicker = "NOW SHOWING  -  " .. c.rankText:upper() end
+        self.preview = ft
+        self.hover = nil
+        self:Hush(0.05)
     else
         self:Point(("Under wraps for now. %s%s|r is still being built in the back room."):format(NAME, c.soon or "Something new"), "wave")
     end
@@ -681,8 +699,12 @@ end
 
 function UI:CabinetLeave(c)
     c.over = false
-    self.preview = nil
-    self:Unpoint()
+    if c.game then
+        self.preview = nil
+        self.tipT = max(self.tipT or 0, 6)
+    else
+        self:Unpoint()
+    end
 end
 
 function UI:CabinetClick(c)
@@ -750,7 +772,8 @@ function UI:RefreshFloor()
     for _, c in ipairs(self.slots) do
         local g = c.game
         if g then
-            local _, board, day = self:CardStat(g)
+            local stat, board, day = self:CardStat(g)
+            c.cap:SetText(stat or "")
             -- a ribbon for a top-three place among your guild, friends or realm
             c.rankText = nil
             local ribbon
@@ -781,20 +804,31 @@ end
 ---------------------------------------------------------------------------
 -- Today's specials: the dailies chalked on the board, ticked off as you play them
 ---------------------------------------------------------------------------
-local BOARD_W, BOARD_H = 252, 112
-local BOARD_Y = 548
+-- A wide board drawn at any width: its two ends keep their shape and only the plain middle stretches.
+local function Board(parent, tex, w, h, aspect, capL, capR)
+    local nat = h * aspect
+    local lw, rw = floor(nat * capL + 0.5), floor(nat * capR + 0.5)
+    local l = parent:CreateTexture(nil, "BACKGROUND")
+    l:SetTexture(tex); l:SetTexCoord(0, capL, 0, 1)
+    l:SetPoint("TOPLEFT"); l:SetSize(lw, h)
+    local r = parent:CreateTexture(nil, "BACKGROUND")
+    r:SetTexture(tex); r:SetTexCoord(1 - capR, 1, 0, 1)
+    r:SetPoint("TOPRIGHT"); r:SetSize(rw, h)
+    local m = parent:CreateTexture(nil, "BACKGROUND")
+    m:SetTexture(tex); m:SetTexCoord(capL, 1 - capR, 0, 1)
+    m:SetPoint("TOPLEFT", parent, "TOPLEFT", lw, 0)
+    m:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -rw, 0)
+end
 
 function UI:BuildSpecials(f)
     local b = CreateFrame("Frame", nil, f)
-    b:SetPoint("TOPLEFT", f, "TOPLEFT", 6, -BOARD_Y)
+    b:SetPoint("TOPLEFT", f, "TOPLEFT", 4, -BOARD_Y)
     b:SetSize(BOARD_W, BOARD_H)
     b:SetFrameLevel(f:GetFrameLevel() + 2)
-    local slate = b:CreateTexture(nil, "BACKGROUND")
-    slate:SetTexture(T .. "tav_chalkboard")
-    slate:SetAllPoints()
+    Board(b, T .. "tav_chalkboard", BOARD_W, BOARD_H, 2.52, 0.12, 0.46)
     local c = COLORS.chalk
     local t = W.Text(b, 13, W.FONT_TITLE)
-    t:SetPoint("TOP", 0, -17)
+    t:SetPoint("TOP", 0, -14)
     t:SetText("Today's Specials")
     t:SetTextColor(c[1], c[2], c[3])
     t:SetShadowColor(0, 0, 0, 0)
@@ -804,29 +838,29 @@ function UI:BuildSpecials(f)
     self.specials = {}
     for i = 1, 4 do
         local r = CreateFrame("Button", nil, b)
-        r:SetSize(i == 4 and 160 or 206, 14)     -- the last line stops short of the rag on the ledge
-        r:SetPoint("TOPLEFT", 23, -35 - (i - 1) * 14)
+        r:SetSize(166, 13.5)
+        r:SetPoint("TOPLEFT", 21, -30 - (i - 1) * 13.5)
         -- a chalk box, ticked when the special is done
         r.box = {}
         for k = 1, 4 do
             local e = W.Solid(r, "ARTWORK", c[1], c[2], c[3], 0.55)
             r.box[k] = e
         end
-        r.box[1]:SetSize(8, 1); r.box[1]:SetPoint("TOPLEFT", 0, -3)
-        r.box[2]:SetSize(8, 1); r.box[2]:SetPoint("TOPLEFT", 0, -10)
-        r.box[3]:SetSize(1, 8); r.box[3]:SetPoint("TOPLEFT", 0, -3)
-        r.box[4]:SetSize(1, 8); r.box[4]:SetPoint("TOPLEFT", 7, -3)
+        r.box[1]:SetSize(9, 1); r.box[1]:SetPoint("TOPLEFT", 0, -3)
+        r.box[2]:SetSize(9, 1); r.box[2]:SetPoint("TOPLEFT", 0, -11)
+        r.box[3]:SetSize(1, 9); r.box[3]:SetPoint("TOPLEFT", 0, -3)
+        r.box[4]:SetSize(1, 9); r.box[4]:SetPoint("TOPLEFT", 8, -3)
         r.tick = r:CreateTexture(nil, "OVERLAY")
         r.tick:SetTexture(T .. "tav_tick")
-        r.tick:SetSize(15, 15)
+        r.tick:SetSize(17, 17)
         r.tick:SetPoint("CENTER", r, "LEFT", 5, 2)
-        r.text = W.Text(r, 10.5, W.FONT)
-        r.text:SetPoint("LEFT", 14, 0)
-        r.text:SetPoint("RIGHT", -52, 0)
+        r.text = W.Text(r, 11.5, W.FONT)
+        r.text:SetPoint("LEFT", 15, 0)
+        r.text:SetPoint("RIGHT", -46, 0)
         r.text:SetJustifyH("LEFT")
         if r.text.SetWordWrap then r.text:SetWordWrap(false) end
         r.text:SetShadowColor(0, 0, 0, 0)
-        r.state = W.Text(r, 10.5, W.FONT)
+        r.state = W.Text(r, 11.5, W.FONT)
         r.state:SetPoint("RIGHT", 0, 0)
         r.state:SetJustifyH("RIGHT")
         r.state:SetShadowColor(0, 0, 0, 0)
@@ -847,7 +881,7 @@ function UI:Specials()
     local spec = R and R.Flying()
     if spec then
         local e = R.Log()[spec.id]
-        out[#out + 1] = { kind = "flight", key = "putt", holes = spec.holes, text = ("%s > %s"):format(spec.from, spec.to),
+        out[#out + 1] = { kind = "flight", key = "putt", holes = spec.holes, from = spec.from, to = spec.to, text = "This flight's round",
             done = e and e.best and NS.Putt.FormatTime(e.best),
             state = ("|cff9fe08a%d hole%s|r"):format(spec.holes, spec.holes == 1 and "" or "s"),
             say = ("The flight you're on: a %d-hole round of golf that lasts as long as the trip."):format(spec.holes),
@@ -881,7 +915,7 @@ function UI:Specials()
     -- Rune Breaker run in progress (the board has four lines; in the air the flight takes this one)
     local run = db.peg and db.peg.run
     if #out < 4 then
-        out[#out + 1] = { kind = "run", key = "peg", text = run and ("Rune Breaker: stage " .. (run.level or 1)) or "Rune Breaker: new run",
+        out[#out + 1] = { kind = "run", key = "peg", text = run and ("Runes: stage " .. (run.level or 1)) or "Runes: new run",
             state = "", go = function() NS.Shell:SelectTab("peg") end,
             say = run and ("Your %sRune Breaker|r run is waiting at stage %d."):format(NAME, run.level or 1)
                 or ("Start a new %sRune Breaker|r run: pick a hero and clear every orange rune."):format(NAME) }
@@ -902,7 +936,7 @@ function UI:RefreshSpecials()
             local state = it.done and ("|cff9fe08a" .. it.done .. "|r") or it.state or "|cffffd27anew!|r"
             r.state:SetText(state)
             -- a line with nothing on the right gets the whole width for its words
-            r.text:SetPoint("RIGHT", r, "RIGHT", state == "" and -2 or -52, 0)
+            r.text:SetPoint("RIGHT", r, "RIGHT", state == "" and -2 or -46, 0)
             r:SetScript("OnClick", function() W.SFX("pop2"); it.go() end)
             r:Show()
         else
@@ -919,12 +953,10 @@ local BOARD_NAMES = { rb = "Rune Breaker", putt = "the Greens daily", flap = "Fe
 
 function UI:BuildTalk(f)
     local t = CreateFrame("Button", nil, f)
-    t:SetPoint("TOPLEFT", f, "TOPLEFT", 262, -BOARD_Y)
+    t:SetPoint("TOPLEFT", f, "TOPLEFT", 218, -BOARD_Y)
     t:SetSize(BOARD_W, BOARD_H)
     t:SetFrameLevel(f:GetFrameLevel() + 2)
-    local cork = t:CreateTexture(nil, "BACKGROUND")
-    cork:SetTexture(T .. "tav_noticeboard")
-    cork:SetAllPoints()
+    Board(t, T .. "tav_noticeboard", BOARD_W, BOARD_H, 2.55, 0.12, 0.12)
     t:SetScript("OnEnter", function()
         self:Point(("%sTavern Talk|r: the latest scores from your friends and guild get pinned here. Click to read on."):format(NAME), "point")
     end)
@@ -932,15 +964,15 @@ function UI:BuildTalk(f)
     t:SetScript("OnClick", function() W.SFX("pop1"); self:TurnTalk() end)
     self.talkBoard = t
     -- the board's name, carved along the top of its frame
-    local title = W.Text(t, 10, W.FONT_TITLE)
+    local title = W.Text(t, 11, W.FONT_TITLE)
     title:SetPoint("TOP", t, "TOP", 0, -1)
     title:SetText("Tavern Talk")
     title:SetTextColor(1, 0.86, 0.52)
     self.notes = {}
     for i = 1, 2 do
         local n = CreateFrame("Frame", nil, t)
-        n:SetSize(214, 39)
-        n:SetPoint("TOPLEFT", t, "TOPLEFT", i == 1 and 17 or 21, -(15 + (i - 1) * 42))
+        n:SetSize(176, 41)
+        n:SetPoint("TOPLEFT", t, "TOPLEFT", i == 1 and 14 or 18, -(16 + (i - 1) * 44))
         n:SetFrameLevel(t:GetFrameLevel() + 1)
         local p = n:CreateTexture(nil, "ARTWORK")
         p:SetTexture(T .. (i == 1 and "tav_note_a" or "tav_note_b"))
@@ -949,9 +981,9 @@ function UI:BuildTalk(f)
         pin:SetTexture(T .. "tav_pin")
         pin:SetSize(20, 20)
         pin:SetPoint("CENTER", n, "TOPLEFT", 12, -8)
-        n.text = W.Text(n, 10, W.FONT)
-        n.text:SetPoint("TOPLEFT", 24, -6)
-        n.text:SetPoint("BOTTOMRIGHT", -12, 7)
+        n.text = W.Text(n, 11, W.FONT)
+        n.text:SetPoint("TOPLEFT", 23, -5)
+        n.text:SetPoint("BOTTOMRIGHT", -8, 7)
         n.text:SetJustifyH("LEFT")
         if n.text.SetJustifyV then n.text:SetJustifyV("MIDDLE") end
         if n.text.SetMaxLines then n.text:SetMaxLines(2) end
@@ -1074,17 +1106,6 @@ function UI:OnUpdate(el)
     self.t = self.t + el
     local t = self.t
 
-    -- lantern light on the wall
-    for i, g in ipairs(self.lamps) do
-        local q = t * (5 + i) + i * 2
-        g:SetAlpha(still and 0.5 or (0.44 + 0.08 * sin(q) + 0.05 * sin(q * 2.7 + 1) + 0.04 * sin(q * 5.3)))
-    end
-
-    -- the keeper: breathes a little, hops when she changes pose
-    self.hop = max(0, (self.hop or 0) - el * 4)
-    local bob = still and 0 or (sin(t * 2.1) * 1.2 + sin(self.hop * 3.1416) * 5)
-    self.host.tex:SetPoint("BOTTOM", self.host, "BOTTOM", 4, -4 + bob)
-
     -- her scroll fades in while she talks and away when she is done
     if self.sayOn and self.sayHold then
         self.sayHold = self.sayHold - el
@@ -1103,7 +1124,7 @@ function UI:OnUpdate(el)
     -- every so often she offers a tip of her own
     self.tipT = (self.tipT or 5) - el
     if self.tipT <= 0 then
-        if self.hover then self.tipT = 4 else self:NextTip() end
+        if self.hover or self.preview then self.tipT = 4 else self:NextTip() end
     end
 
     -- the marquee: chasing bulbs, flickering lanterns, features in rotation
@@ -1147,9 +1168,9 @@ function UI:OnUpdate(el)
         m.body:SetAlpha(m.alpha)
     end
 
-    -- the floor: a cabinet lifts and lights up when you point at it; runes pulse; screens flicker
+    -- the floor: a cabinet lifts and lights up when you point at it
     for _, c in ipairs(self.slots) do
-        local wantLift = (c.over and not still) and 4 or 0
+        local wantLift = (c.over and c.game and not still) and 4 or 0
         if c.lift ~= wantLift then
             local d = wantLift - c.lift
             c.lift = abs(d) < 0.1 and wantLift or (c.lift + d * min(1, el * 14))
@@ -1159,10 +1180,7 @@ function UI:OnUpdate(el)
             local wantGlow = c.over and 1 or 0
             c.glow = c.glow + (wantGlow - c.glow) * min(1, el * 10)
             c.lamp:SetAlpha(c.glow * (still and 0.8 or (0.75 + 0.15 * sin(t * 11 + c.phase))))
-            c.screen:SetAlpha(0.10 + 0.22 * c.glow + (still and 0 or 0.03 * sin(t * 7 + c.phase * 3)))
-            c.rune:SetAlpha(still and 0.4 or (0.32 + 0.22 * sin(t * 1.8 + c.phase) + 0.3 * c.glow))
-            local v = 0.82 + 0.18 * c.glow
-            c.art:SetVertexColor(v, v, v)
+            c.screen:SetAlpha(0.08 + 0.26 * c.glow)
         end
     end
     local p = self.plaque
