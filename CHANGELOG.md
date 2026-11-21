@@ -2,14 +2,18 @@
 
 ## 2.2.0
 
-**Gryphon Greens is a much harder, much more interesting game.** The holes had become so easy that a strong player could bank a whole round down to 0 seconds. Every one of the 54 holes has been rebuilt on its existing layout:
+**Gryphon Greens rebuilt.** The holes had become so easy that a strong player could bank a whole round down to 0 seconds. Every hole has been redesigned on its existing layout, following what the best mini golf games do: one idea per hole, a wide safe way round, a skilful line to the cup, and slopes that help a good putt as often as they punish a poor one.
 
-- **Greens with contours, like real putting.** Rises and hollows are shaded into the felt, with chevrons drifting downhill so you can read them. A putt across a slope breaks downhill, and breaks more the slower it rolls. Putt up a steep rise too softly and the ball runs out of pace and rolls back down; hit it firmly and it goes over the top
-- **Crowned cups and punchbowls.** Some cups sit on a level crown with a slope all round (too soft comes back to you, too firm runs off the far side); others lie at the bottom of a punchbowl that gathers anything over its lip
-- **Walls and posts on every hole.** Low stone walls jut off the curbs to close the straight lines and make chicanes, and posts stand in the lanes and guard the cups
+- **Greens with contours, like real putting.** Rises and hollows are shaded into the felt, with chevrons drifting downhill: pale and slow on a gentle slope, amber and quick on a steep one. A putt across a slope breaks downhill, and breaks more the slower it rolls. Putt up a steep rise too softly and the ball runs out of pace and rolls back down; hit it firmly and it goes over the top
+- **The aim line reads the break.** Over its first stretch the dotted line bends the way the green will take the ball at the pace you are pulling. Rails, bounces and anything that moves are still yours to judge
+- **One idea per hole.** A wall across half the lane to bank round, a blocker to go either side of, a post, a rise to go over or round, a pass between two rises that gathers a well-aimed putt, a broad swell that bends the line. No opening is ever less than half the lane
+- **Crowned cups, punchbowls and backstops.** Some cups sit on a level crown with a slope all round; some lie in a punchbowl that gathers anything over its lip; some have a rise behind them that brings a bold putt back
+- **A real cup lip.** A putt catching the edge of the cup has to arrive slower than one dead centre
+- **Painted props** for each land (stumps in Elwynn, kegs in Dun Morogh, moonstones in Teldrassil and so on) replace the plain round posts
 - **More creatures on the course.** Holes that had nothing moving now have one of the locals walking the lane: kobolds at Northshire, a harvest golem at Westfall, rams, yetis, kodos, harpies, ghouls, wisps and more
-- **Honest pars**, set by play-testing every rebuilt hole
+- **Honest pars**, set by play-testing every rebuilt hole with a strong player and a casual one
 - **Bonuses can take off at most half your time**, so no round can be banked down to nothing
+- Circle of Binding's crack no longer fires the ball straight into the cup
 - Best times set on the old holes are retired: course, route and today's daily bests start fresh, and new times are never ranked against times from older versions. Your stats, unlocks and flight log are kept
 - Versus needs both players on this version (the game tells you if they are not)
 

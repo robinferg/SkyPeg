@@ -38,21 +38,26 @@ Unzip so you have `World of Warcraft\_forever_\Interface\AddOns\FlightBuddy\Flig
 | `/fb resetpos` | Move the window back to the centre |
 
 ## Gryphon Greens
-Click and drag back from anywhere, like a slingshot, then let go to putt. The dotted line shows your aim and first bounce.
+Click and drag back from anywhere, like a slingshot, then let go to putt. The dotted line shows your aim, and over
+its first stretch it bends the way the green will take the ball at the pace you are pulling.
 Pull into the red for maximum power, but your aim gets a little shaky.
 
 It's a **time trial**: the clock runs from your first putt to your last cup. Each stroke under par takes 5 seconds off,
 each stroke over par adds 5 seconds, and a hole-in-one takes off an extra 5 seconds. Bonuses can take off at most
 half your time. Water, lava and slime cost a stroke.
 
-Every hole has walls jutting off the curbs and posts in the lanes: the straight line is nearly always closed, so read
-the gaps, play from one to the next, and use the curbs to bank round.
+Every hole is built round one idea standing where the easy putt would go: a wall across half the lane to bank round,
+a gate to thread, a post to pick a side of, a rise to go over or round, a pass between two rises that gathers a
+well-aimed putt, a broad swell that bends the line. Openings are never less than half the lane, and every hole can be
+aced with the right shot.
 
 The greens have **contours**, like a real putting green. A shaded dome is a rise and a dish is a hollow; chevrons drift
 downhill to show which way a ball will roll. A putt across a slope **breaks** downhill, and breaks more the slower it is
 rolling. Putt up a steep rise too softly and the ball runs out of pace and rolls back; hit it firmly and it goes over
 the top. Some cups sit on a **crown** (a level top with a slope all round: too soft comes back to you, too hard runs off
-the far side) and some at the bottom of a **punchbowl** that gathers anything that reaches it.
+the far side), some at the bottom of a **punchbowl** that gathers anything that reaches it, and some have a
+**backstop**: a rise behind the cup that brings a bold putt back. The chevrons are pale and slow on a gentle slope,
+amber and quick on a steep one.
 
 - **Daily course**: the same course for everyone that day. Replay as often as you like; your best time counts.
 - **Quick round**: any course, any time. Your best time on each course goes on that course's leaderboard.

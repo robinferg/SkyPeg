@@ -711,11 +711,12 @@ function UI:RenderHole()
                 -- extra obstacles on painted holes: a themed post sprite with its own drop shadow
                 -- the base is a solid dark disc the size of the post (from art that always loads),
                 -- so the obstacle is visible even before the sprite file is picked up
-                local size = b.r * 2 + 7
+                local size = b.r * 2 + 4
                 s2.body:SetTexture(W.MEDIA .. "greens\\post_" .. b.style)
                 s2.body:SetVertexColor(1, 1, 1)
                 s2.body:SetSize(size, size)
                 s2.body:SetDrawLayer("ARTWORK", 3)
+                s2.body:SetTexCoord(0, 1, 0, 1)
                 s2.shade:SetTexture(W.MEDIA .. "circle")
                 s2.shade:SetVertexColor(0.1, 0.09, 0.08, 0.9)
                 s2.shade:SetSize(b.r * 2 + 4, b.r * 2 + 4)
@@ -938,14 +939,16 @@ function UI:DrawHazards(el)
         local n = c.r >= 40 and 8 or 6
         for k = 1, n do
             local an = (k - 1) * 2 * pi / n + ci * 0.7
-            local ph = calm and 0.5 or ((rt * 0.28 + k * 0.37) % 1)
+            local hot = max(0, min(1, (abs(c.a) - 70) / 110))
+            local ph = calm and 0.5 or ((rt * (0.16 + 0.26 * hot) + k * 0.37) % 1)
             local u = c.flat + (1 - c.flat) * (rise and (0.18 + 0.7 * ph) or (0.88 - 0.7 * ph))
             local x, y = c.x + cos(an) * c.r * u, c.y + sin(an) * c.r * u
             local ch = self:Hz("lchev", "t_chevron", "ARTWORK", -2)
             ch:SetSize(13, 13); ch:SetPoint("CENTER", cv, "TOPLEFT", x, -y)
             local dx, dy = cos(an) * (rise and 1 or -1), sin(an) * (rise and 1 or -1)
             if ch.SetRotation then ch:SetRotation(-atan2(dx, -dy)) end
-            ch:SetVertexColor(0.95, 1, 0.8, (calm and 0.6 or sin(ph * pi)) * (0.5 + 0.3 * steep))
+            -- like the beads on a putting grid: pale and slow on a gentle slope, amber and quick on a steep one
+            ch:SetVertexColor(1, 1 - 0.3 * hot, 0.85 - 0.65 * hot, (calm and 0.6 or sin(ph * pi)) * (0.5 + 0.3 * steep))
         end
     end
     -- added walls (PuttHard.lua): a course of stone blocks in the colour of the hole's own curb
@@ -2072,11 +2075,10 @@ function UI:UpdateAim(el)
         return
     end
     local club = self:Club()
-    -- a straight aim line: direction and power only, no peeking at the bounces
-    local g0 = g:Guide(a, 1)
-    local ox, oy = g0[1], g0[2]
+    -- the aim line: direction and power, bending with the lie of the green over its first stretch
+    -- (the break is read for you; rails, bounces and anything that moves are still yours to judge)
     local len = 40 + power * 170
-    local pts = { ox, oy, ox + cos(a) * len, oy + sin(a) * len }
+    local pts = g:Preview(a, power, len)
     -- lay dots along the polyline
     local n, spacing = 0, 9
     local carry = 0
@@ -2213,13 +2215,13 @@ function UI:ShowHelp()
     self.card:Open({
         title = "Gryphon Greens", color = COLORS.green,
         body = table.concat({
-            "|cffffcc40Putt|r: click and drag |cffffcc40back|r from anywhere, like a slingshot, and let go. The dotted line shows your aim and first bounce. Right-click cancels.",
+            "|cffffcc40Putt|r: click and drag |cffffcc40back|r from anywhere, like a slingshot, and let go. The dotted line shows your aim, and bends the way the green will take the ball. Right-click cancels.",
             "",
             "Past three quarters power the meter turns |cffffb030amber|r then |cffff5040red|r and your aim gets shaky. The ball must reach the cup gently to drop.",
             "",
             "It's a |cffffcc40time trial|r, first putt to last cup. Every stroke under par takes 5s off, every stroke over adds 5s, and a hole-in-one takes off 5s more. Bonuses can take off at most half your time.",
             "",
-            "|cffffcc40Read the green|r: a shaded dome is a rise, a dish is a hollow, and the chevrons run downhill. Putts break down the slope, more as they slow, and a ball that dies on a steep flank rolls back down.",
+            "|cffffcc40Read the green|r: a shaded dome is a rise, a dish is a hollow, and the chevrons run downhill: pale and slow on a gentle slope, amber and quick on a steep one. Putts break more as they slow, and a ball that dies on a steep flank rolls back.",
             "",
             "Water, lava and slime cost a stroke. A ball that stops against a rail is moved a club-head off it.",
             "",

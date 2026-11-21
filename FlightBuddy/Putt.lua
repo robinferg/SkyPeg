@@ -1981,6 +1981,50 @@ function Putt:Guide(angle, maxLen)
     return pts
 end
 
+-- The aim line with the break read into it: the path the ball takes over its first `len` units,
+-- bending with the lie of the green (rises, hollows and painted slopes) at the pace it is hit.
+-- Only the ground is read, not rails or anything that moves: what happens after the first
+-- stretch is still yours to judge.
+function Putt:Preview(angle, power, len)
+    local hole, b = self.hole, self.ball
+    local x, y = b.x, b.y
+    local sp = Putt.SpeedFor(power)
+    if self.blessed then sp = sp * 1.35 end
+    local vx, vy = cos(angle) * sp, sin(angle) * sp
+    local pts = { x, y }
+    local h, gone, mark = 1 / 120, 0, 0
+    for _ = 1, 900 do
+        local t = TERRAIN[Putt.Cell(hole, x, y) or " "] or TERRAIN["."]
+        local ax, ay = Putt.Lie(hole, x, y)
+        if t.slope then ax, ay = ax + t.slope[1] * P.SLOPE, ay + t.slope[2] * P.SLOPE end
+        vx, vy = vx + ax * h, vy + ay * h
+        local v = sqrt(vx * vx + vy * vy)
+        if v > 0 then
+            local nv = v - ((t.decel or P.DECEL) + (t.drag or P.DRAG) * v) * h
+            if nv <= 2 then break end
+            vx, vy, v = vx * nv / v, vy * nv / v, nv
+        end
+        x, y = x + vx * h, y + vy * h
+        gone = gone + v * h
+        if gone - mark >= 6 then mark = gone; pts[#pts + 1], pts[#pts + 2] = x, y end
+        if gone >= len then break end
+    end
+    if gone < len then
+        -- a putt too soft to cover the line: carry it on straight, so the line never gives the distance away
+        local n = #pts
+        local dx, dy = cos(angle), sin(angle)
+        if n >= 4 then
+            local ex, ey = pts[n - 1] - pts[n - 3], pts[n] - pts[n - 2]
+            local l = sqrt(ex * ex + ey * ey)
+            if l > 1e-3 then dx, dy = ex / l, ey / l end
+        end
+        pts[#pts + 1], pts[#pts + 2] = x + dx * (len - gone), y + dy * (len - gone)
+    elseif pts[#pts - 1] ~= x or pts[#pts] ~= y then
+        pts[#pts + 1], pts[#pts + 2] = x, y
+    end
+    return pts
+end
+
 ---------------------------------------------------------------------------
 -- Formatting helpers shared by UI and leaderboards
 ---------------------------------------------------------------------------
