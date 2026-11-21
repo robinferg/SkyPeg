@@ -36,17 +36,23 @@ UI.GAMES = {
       art = "key_runes", mx = 0.5, my = 0.70, tx = 0.62, ty = 0.72, tz = 0.56, board = "rb" },
     { key = "putt", name = "Gryphon Greens", tag = "Mini golf against the clock.",
       art = "key_greens", mx = 0.5, my = 0.40, tx = 0.60, ty = 0.36, tz = 0.56, board = "putt", daily = true },
+    { key = "gem",  name = "Jewelcrafter's Bench", plate = "Jewelcrafter", tag = "Cut gems three in a row.",
+      art = "key_gems", mx = 0.5, my = 0.50, tx = 0.40, ty = 0.50, tz = 0.56, board = "gemd", daily = true },
+    -- (the Forge and the Minefield borrow Rune Breaker backdrops until their own key art is painted: `file` is a
+    -- whole texture path used instead of tavern\<art>)
+    { key = "forge", name = "The Great Forge", plate = "Great Forge", tag = "Smelt your way to Arcanite.",
+      file = W.MEDIA .. "pbg_forge_anvil", mx = 0.5, my = 0.55, tx = 0.50, ty = 0.56, tz = 0.70, board = "fgd", daily = true },
+    { key = "mines", name = "Goblin Minefield", plate = "Minefield", tag = "Dig everything but the mines.",
+      file = W.MEDIA .. "pbg_steppe_bones", mx = 0.5, my = 0.55, tx = 0.50, ty = 0.60, tz = 0.70, board = "msd", daily = true },
+    { key = "roll", name = "Death Roll", tag = "Wager gold on the roll of the dice.",
+      art = "key_roll", mx = 0.5, my = 0.60, tx = 0.60, ty = 0.60, tz = 0.60 },
     { key = "flap", name = "Featherbeard", tag = "Fly a gryphon through Dun Morogh.",
       art = "key_gryphon", mx = 0.5, my = 0.30, tx = 0.60, ty = 0.36, tz = 0.74, board = "flap" },
     { key = "pin",  name = "High Tinker Pinball", plate = "Pinball", tag = "Gnomish pinball in Tinker Town.",
       art = "key_pinball", mx = 0.5, my = 0.50, tx = 0.50, ty = 0.50, tz = 0.56, board = "pin" },
-    { key = "gem",  name = "Jewelcrafter's Bench", plate = "Jewelcrafter", tag = "Cut gems three in a row.",
-      art = "key_gems", mx = 0.5, my = 0.50, tx = 0.40, ty = 0.50, tz = 0.56, board = "gemd", daily = true },
-    { key = "roll", name = "Death Roll", tag = "Wager gold on the roll of the dice.",
-      art = "key_roll", mx = 0.5, my = 0.60, tx = 0.60, ty = 0.60, tz = 0.60 },
 }
 -- games still being built: they stand on the floor under dust sheets
-UI.SOON = { "Deeprun Tram Runner", "Azeroth Trivia", "Goblin Minefield" }
+UI.SOON = { "Deeprun Tram Runner", "Azeroth Trivia", "Tavern Solitaire" }
 UI.PER_PAGE = 6
 
 local function Today() return NS.Social and NS.Social.Today() or (date and date("%Y%m%d")) or "" end
@@ -359,7 +365,7 @@ function UI:ApplyFeature(ft)
     m.title:SetText(ft.title or "")
     m.sub:SetText(ft.sub or "")
     local g = ft.game or UI.GAMES[1]
-    m.art:SetTexture(T .. g.art)
+    m.art:SetTexture((g.file or (T .. g.art)))
     ArtWindow(m.art, m.artW, m.artH, g.mx, g.my, 1)
     local n = ft.preview and 0 or #(self.features or {})
     for i, p in ipairs(m.pips) do
@@ -655,7 +661,7 @@ function UI:FillFloor()
         if g then
             c:Show()
             c.cab:Show(); c.sheet:Hide(); c.art:Show(); c.back:Show(); c.plate:Show()
-            c.art:SetTexture(T .. g.art)
+            c.art:SetTexture((g.file or (T .. g.art)))
             ArtWindow(c.art, c.artW, c.artH, g.tx, g.ty, g.tz)
             c.name:SetText(g.plate or g.name)
         elseif c.soon then
@@ -730,6 +736,12 @@ function UI:Played(g)
         return ((db.pin and db.pin.games) or 0) > 0
     elseif g.key == "gem" then
         return ((db.gem and db.gem.games) or 0) > 0 or ((db.gem and db.gem.level) or 1) > 1
+    elseif g.key == "forge" then
+        local s = db.forge or {}
+        return (s.games or 0) > 0 or s.run ~= nil or (s.bestBar or 0) > 0
+    elseif g.key == "mines" then
+        local s = db.mines or {}
+        return (s.games or 0) > 0 or s.run ~= nil
     elseif g.key == "roll" then
         return db.dr ~= nil and ((db.dr.wins or 0) + (db.dr.losses or 0)) > 0
     end
@@ -762,6 +774,20 @@ function UI:CardStat(g)
         local d = G.db and G:Daily()
         if d and (d.best or 0) > 0 then return "Today " .. W.Short(d.best), "gemd", Today() end
         return ("Work Order #%d"):format((db.gem and db.gem.level) or 1), "gemd", Today()
+    elseif g.key == "forge" then
+        local F = NS.ForgeUI
+        local d = F.db and F:Daily()
+        local s = db.forge or {}
+        if d and (d.best or 0) > 0 then return "Today " .. W.Short(d.best), "fgd", Today() end
+        if s.run then return "Forge lit  |  " .. W.Short(s.run.score or 0), "fgd", Today() end
+        return (s.best or 0) > 0 and ("Best " .. W.Short(s.best)) or "Light the forge", "fgd", Today()
+    elseif g.key == "mines" then
+        local Mi = NS.MinesUI
+        local d = Mi.db and Mi:Daily()
+        local s = db.mines or {}
+        if d and d.done then return "Today " .. Mi.Clock(d.best), "msd", Today() end
+        if (s.wins or 0) > 0 then return ("%d field%s cleared"):format(s.wins, s.wins == 1 and "" or "s"), "msd", Today() end
+        return "Mind your step", "msd", Today()
     end
     return ""
 end
@@ -912,7 +938,36 @@ function UI:Specials()
         done = gd and (gd.best or 0) > 0 and W.Short(gd.best),
         say = ("The %sDaily Commission|r: one gem board a day at the Jewelcrafter's Bench. Highest score wins."):format(NAME),
         go = function() NS.Shell:SelectTab("gem"); if G.Begin then G:Begin("daily", { day = Today() }) end end }
-    -- Rune Breaker run in progress (the board has four lines; in the air the flight takes this one)
+    -- the Great Forge's Daily Smelt
+    local F = NS.ForgeUI
+    local fgd = F and F.db and F:Daily()
+    if fgd then
+        out[#out + 1] = { kind = "daily", key = "forge", text = "Daily Smelt", title = "Daily Smelt", blurb = "Same bars for everyone. Highest score wins.",
+            done = (fgd.best or 0) > 0 and W.Short(fgd.best),
+            say = ("The %sDaily Smelt|r at the Great Forge: the same bars drop for everyone. Highest score wins."):format(NAME),
+            go = function() NS.Shell:SelectTab("forge"); if F.Begin then F:Begin("daily") end end }
+    end
+    -- the Goblin Minefield's Daily Sweep
+    local Mi = NS.MinesUI
+    local msd = Mi and Mi.db and Mi:Daily()
+    if msd then
+        out[#out + 1] = { kind = "daily", key = "mines", text = "Daily Sweep", title = "Daily Sweep", blurb = "Same minefield for everyone. Fastest clear wins.",
+            done = msd.done and Mi.Clock(msd.best),
+            say = ("The %sDaily Sweep|r: one goblin minefield a day, the same for everyone. Fastest clear wins."):format(NAME),
+            go = function() NS.Shell:SelectTab("mines"); if Mi.Begin and not msd.done and Mi.game and Mi.game.state ~= "play" then Mi:Begin("daily") end end }
+    end
+    -- the board has four lines: the flight comes first, then the dailies still open, then the
+    -- ones already played
+    if #out > 4 then
+        local keep, done = {}, {}
+        for _, it in ipairs(out) do
+            if it.kind == "flight" or not it.done then keep[#keep + 1] = it else done[#done + 1] = it end
+        end
+        for _, it in ipairs(done) do keep[#keep + 1] = it end
+        out = keep
+        while #out > 4 do out[#out] = nil end
+    end
+    -- Rune Breaker run in progress (only when there is a line to spare)
     local run = db.peg and db.peg.run
     if #out < 4 then
         out[#out + 1] = { kind = "run", key = "peg", text = run and ("Runes: stage " .. (run.level or 1)) or "Runes: new run",
@@ -949,7 +1004,9 @@ end
 -- Tavern Talk: the latest results from your friends and guild, pinned to the notice board
 ---------------------------------------------------------------------------
 local BOARD_NAMES = { rb = "Rune Breaker", putt = "the Greens daily", flap = "Featherbeard", flapd = "the Ironforge Run",
-    pin = "Pinball", gem = "Gem Rush", gemd = "the Daily Commission", gemw = "Work Orders" }
+    pin = "Pinball", gem = "Gem Rush", gemd = "the Daily Commission", gemw = "Work Orders",
+    fg = "the Great Forge", fgd = "the Daily Smelt",
+    ms1 = "the Scrap Heap minefield", ms2 = "the Proving Grounds minefield", ms3 = "the No Man's Land minefield", msd = "the Daily Sweep" }
 
 function UI:BuildTalk(f)
     local t = CreateFrame("Button", nil, f)
@@ -1086,7 +1143,7 @@ function UI:OnShow()
     self:RefreshPortrait()
     if NS.Social then
         -- ask around for today's dailies so the talk and ranks are fresh
-        for _, g in ipairs({ "putt", "flapd" }) do pcall(NS.Social.Query, NS.Social, g, Today()) end
+        for _, g in ipairs({ "putt", "flapd", "gemd", "fgd", "msd" }) do pcall(NS.Social.Query, NS.Social, g, Today()) end
     end
     self.refreshT = 2
     self.mqT = 0

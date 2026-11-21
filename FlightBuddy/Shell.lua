@@ -15,17 +15,20 @@ Shell.TABS = {
     { key = "home", full = "Tavern", tip = "The common room: every game, today's specials and the latest talk", tok = "tok_home",  label = "Tavern", icon = "Interface\\Icons\\INV_Drink_04", sub = "The common room", neon = { 1.0, 0.8, 0.4 } },
     { key = "peg", full = "Rune Breaker", tip = "Shatter runes with Warcraft heroes", tok = "tok_runes", short = "Runes",   label = "Rune Breaker", icon = "Interface\\Icons\\INV_Misc_Rune_01", sub = "Rune Breaker", neon = { 1.0, 0.55, 0.15 } },
     { key = "putt", full = "Gryphon Greens", tip = "Mini golf against the clock", tok = "tok_greens",  label = "Greens",    icon = "Interface\\Icons\\INV_Misc_Orb_01",        sub = "Daily putt", daily = true, neon = { 0.35, 0.95, 0.45 } },
-    { key = "flap", full = "Featherbeard", tip = "Fly a gryphon through Dun Morogh", tok = "tok_gryphon", short = "Gryphon",  label = "Featherbeard", icon = "Interface\\Icons\\Ability_Mount_Gryphon_01", sub = "Gryphon flight", neon = { 1.0, 0.75, 0.30 } },
     { key = "gem", full = "Jewelcrafter's Bench", tip = "Cut gems three in a row", tok = "tok_gems",   label = "Jewelcrafter", short = "Gems", icon = "Interface\\Icons\\INV_Misc_Gem_01", sub = "Jewelcrafter's Bench", daily = true, neon = { 0.6, 0.8, 1 } },
-    { key = "pin", full = "High Tinker Pinball", tip = "Gnomish pinball in Tinker Town", tok = "tok_pinball",   label = "Pinball", icon = "Interface\\Icons\\Trade_Engineering", sub = "High Tinker Pinball", neon = { 1.0, 0.55, 0.20 } },
+    -- (no tokens have been painted for the Forge or the Minefield yet: `glyph` puts a game icon on a blank token)
+    { key = "forge", full = "The Great Forge", tip = "Smelt bars two by two, all the way to Arcanite", glyph = "Interface\\Icons\\Trade_BlackSmithing", label = "Forge", short = "Forge", icon = "Interface\\Icons\\Trade_BlackSmithing", sub = "The Great Forge", daily = true, neon = { 1.0, 0.5, 0.2 } },
+    { key = "mines", full = "Goblin Minefield", tip = "Dig everything but the mines", glyph = "Interface\\Icons\\INV_Misc_Bomb_04", label = "Minefield", short = "Mines", icon = "Interface\\Icons\\INV_Misc_Bomb_04", sub = "Goblin Minefield", daily = true, neon = { 0.6, 0.95, 0.4 } },
     { key = "roll", full = "Death Roll", tip = "Wager gold on the roll of the dice", tok = "tok_roll",  label = "Death Roll", short = "Roll", icon = W.MEDIA .. "deathroll\\dr_icon", fullIcon = true, sub = "Death Roll", neon = { 1.0, 0.3, 0.25 } },
+    { key = "flap", full = "Featherbeard", tip = "Fly a gryphon through Dun Morogh", tok = "tok_gryphon", short = "Gryphon",  label = "Featherbeard", icon = "Interface\\Icons\\Ability_Mount_Gryphon_01", sub = "Gryphon flight", neon = { 1.0, 0.75, 0.30 } },
+    { key = "pin", full = "High Tinker Pinball", tip = "Gnomish pinball in Tinker Town", tok = "tok_pinball",   label = "Pinball", icon = "Interface\\Icons\\Trade_Engineering", sub = "High Tinker Pinball", neon = { 1.0, 0.55, 0.20 } },
 }
 
 local function InCombat() return InCombatLockdown and InCombatLockdown() end
 
 function Shell:Init(db)
     self.db = db
-    self.mods = { home = NS.Home, peg = NS.Peg, putt = NS.PuttUI, flap = NS.FlapUI, pin = NS.PinballUI, gem = NS.GemsUI, roll = NS.DeathRollTab }
+    self.mods = { home = NS.Home, peg = NS.Peg, putt = NS.PuttUI, flap = NS.FlapUI, pin = NS.PinballUI, gem = NS.GemsUI, forge = NS.ForgeUI, mines = NS.MinesUI, roll = NS.DeathRollTab }
 end
 
 function Shell:IsShown() return self.frame and self.frame:IsShown() end
@@ -168,6 +171,27 @@ function Shell:Build()
         b.icon = b:CreateTexture(nil, "ARTWORK")
         b.icon:SetPoint("CENTER")
         b.icon:SetTexture(W.TAVERN .. (t and t.tok or "tok_empty"))
+        if t and t.glyph then
+            -- a game without a painted token yet: its icon, cut round, on a dark disc in a brass ring
+            b.icon:SetTexture(W.MEDIA .. "circle")
+            b.icon:SetVertexColor(0.13, 0.09, 0.06)
+            b.glyph = b:CreateTexture(nil, "ARTWORK", nil, 2)
+            b.glyph:SetPoint("CENTER")
+            b.glyph:SetTexture(t.glyph)
+            b.glyph:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+            b.glyphK = 0.60          -- a square icon has to sit inside the ring; cut round it can be bigger
+            if b.CreateMaskTexture and b.glyph.AddMaskTexture then
+                b.glyphK = 0.74
+                local mask = b:CreateMaskTexture()
+                mask:SetTexture(W.MEDIA .. "circle", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+                mask:SetAllPoints(b.glyph)
+                b.glyph:AddMaskTexture(mask)
+            end
+            b.band = b:CreateTexture(nil, "ARTWORK", nil, 3)
+            b.band:SetPoint("CENTER")
+            b.band:SetTexture(W.MEDIA .. "ring")
+            b.band:SetVertexColor(0.92, 0.70, 0.30)
+        end
         b.rim = b:CreateTexture(nil, "OVERLAY")
         b.rim:SetTexture(W.TAVERN .. "tav_ring")
         b.rim:SetBlendMode("ADD")
@@ -181,6 +205,7 @@ function Shell:Build()
         b.dot:Hide()
         b.cur, b.want = 36, 36
         b.icon:SetSize(36, 36)
+        if b.glyph then b.glyph:SetSize(36 * b.glyphK, 36 * b.glyphK); b.band:SetSize(36 * 1.04, 36 * 1.04) end
         b:SetScript("OnEnter", function(btn)
             btn.over = true
             if not GameTooltip then return end
@@ -294,7 +319,13 @@ function Shell:SelectTab(key)
         b.ring:SetShown(on)
         b.rim:SetShown(on)
         local v = on and 1 or 0.86
-        b.icon:SetVertexColor(v, v, v)
+        if b.glyph then
+            b.icon:SetVertexColor(0.13, 0.09, 0.06)
+            b.glyph:SetVertexColor(v, v, v)
+            b.band:SetVertexColor(0.92 * v, 0.70 * v, 0.30 * v)
+        else
+            b.icon:SetVertexColor(v, v, v)
+        end
     end
     -- the sign names the room you are in
     if self.signSub then
@@ -374,6 +405,7 @@ function Shell:OnUpdate(el)
             local d = want - b.cur
             b.cur = (still or math.abs(d) < 0.3) and want or (b.cur + d * math.min(1, el * 16))
             b.icon:SetSize(b.cur, b.cur)
+            if b.glyph then b.glyph:SetSize(b.cur * b.glyphK, b.cur * b.glyphK); b.band:SetSize(b.cur * 1.04, b.cur * 1.04) end
         end
         if b.on then
             local k = still and 0.5 or (0.5 + 0.2 * math.sin(self.bulbT * 2.6))
@@ -604,7 +636,8 @@ function Shell:ShowToast()
         local m = self.mods[tb.key]
         if tb.daily and m and m.DailyPending and m:DailyPending() then pend[#pend + 1] = tb.label end
     end
-    self.toast.l2:SetText(#pend > 0 and ("Today's " .. table.concat(pend, " & ") .. " daily is waiting") or "Play a round while you fly")
+    self.toast.l2:SetText((#pend > 2 and (#pend .. " of today's dailies are waiting")) or (#pend == 2 and ("Today's " .. pend[1] .. " and " .. pend[2] .. " dailies are waiting"))
+        or (#pend == 1 and ("Today's " .. pend[1] .. " daily is waiting")) or "Play a round while you fly")
     self.toast.left = 20
     self.toast:SetAlpha(1)
     self.toast:Show()

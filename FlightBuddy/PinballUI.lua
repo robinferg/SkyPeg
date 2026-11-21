@@ -518,6 +518,21 @@ function UI:OnHide()
     end
 end
 
+-- Logging out or reloading with a game on the table: the table can't be saved mid-ball, so the
+-- score so far stands as a finished game and is never lost.
+function UI:OnLogout()
+    local g = self.game
+    if not g or g.state == "idle" or g.state == "over" or (g.score or 0) <= 0 then return end
+    local db = self.db
+    db.games = db.games + 1
+    if g.score > db.best then db.best = g.score end
+    table.insert(db.top, { s = g.score, d = date and date("%Y-%m-%d") or "" })
+    table.sort(db.top, function(a, b) return a.s > b.s end)
+    while #db.top > 10 do table.remove(db.top) end
+    for k, v in pairs(g.stats or {}) do db.stats[k] = (db.stats[k] or 0) + v end
+    NS.Social:SubmitBest("pin", g.score, ("%d jackpots"):format((g.stats and g.stats.jackpots) or 0))
+end
+
 ---------------------------------------------------------------------------
 -- Input
 ---------------------------------------------------------------------------

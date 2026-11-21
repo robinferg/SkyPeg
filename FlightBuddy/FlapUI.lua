@@ -319,8 +319,11 @@ function UI:OnShow()
 end
 
 function UI:OnHide()
-    -- a run in progress can't sensibly resume mid-air, so it ends
-    if self.game and (self.game.state == "play" or self.game.state == "dead") then
+    -- a run in progress can't sensibly resume mid-air, so it ends: but it ends as a finished
+    -- flight, so a record set just before landing (or before combat closed the window) still counts
+    local g = self.game
+    if g and (g.state == "play" or g.state == "dead") then
+        if (g.score or 0) > 0 then self:OnOver(g.score, g.coins or 0) end
         self:ResetRun()
     end
 end

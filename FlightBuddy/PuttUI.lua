@@ -399,6 +399,7 @@ function UI:Build(parent)
             self.game:Start(course, r)
         end
         self.db.round = nil
+        self:SaveRound(true)
     end
     self:RenderHole()
 end
@@ -423,17 +424,24 @@ function UI:OnShow()
     end
 end
 
-function UI:OnHide()
-    self.drag = nil
+-- Write the round as it stands into the saved data. It is called at every hole and every stroke
+-- as well as when the window closes, so a crash or a dropped connection costs one shot at most.
+-- keep = leave an older save alone when there is no round under way right now.
+function UI:SaveRound(keep)
     local g = self.game
-    if g.state == "aim" or g.state == "roll" or g.state == "sunk" then
+    if g and g.course and (g.state == "aim" or g.state == "roll" or g.state == "sunk") then
         self.db.round = g.course.kind ~= "versus" and g:Snapshot() or nil
         if self.db.round and g.course.kind == "route" then
             self.db.round.route, self.db.round.live = g.course.route, g.course.live
         end
-    else
+    elseif not keep then
         self.db.round = nil
     end
+end
+
+function UI:OnHide()
+    self.drag = nil
+    self:SaveRound()
 end
 
 function UI:OnKey(key)
@@ -1467,11 +1475,13 @@ function E:hole(index, h)
     local title = over and ("Hole %d of %d  -  Par %d"):format(index, #c.holes, h.par) or ("Hole %d  -  Par %d"):format(index, h.par)
     local name = over and ("Over %s:  %s"):format(over, h.name) or h.name
     self:Banner(title, name .. "\n|cff9499b3" .. (h.tip or "") .. "|r", COLORS.gold, 2.2)
+    self:SaveRound(true)
 end
 
 function E:shot(n, power)
     W.SFX("putt")
     V:OnShot(self.game)
+    self:SaveRound(true)
 end
 
 function E:wall(imp)

@@ -937,6 +937,21 @@ end
 
 function UI:StartOrder(level) self:Begin("orders", { level = level or self.db.level }) end
 
+-- put the half-finished Work Order back on the bench
+function UI:ResumeOrder()
+    self.queue, self.phase = {}, nil
+    self:Select(nil)
+    self:HideHint()
+    if self.db.run and self.game:Restore(self.db.run) then
+        self.idleT = 0
+        self:SyncAll(true)
+        self:RefreshHUD()
+    else
+        self.db.run = nil
+        self:StartOrder(self.db.level)
+    end
+end
+
 function UI:Restart()
     local g = self.game
     if g.mode == "orders" and g.order then self:StartOrder(g.order.level)
@@ -1049,7 +1064,12 @@ function UI:ShowMenu()
     if rl then lines[#lines + 1] = "Daily: " .. rl end
     local buttons = {}
     if g.state == "play" then buttons[#buttons + 1] = { "Resume", function() end } end
-    buttons[#buttons + 1] = { inOrder and ("Order #" .. db.level) or ("Work Order #" .. db.level), function() self:StartOrder(db.level) end, g.state == "play" and "ghost" or nil }
+    if db.run and not inOrder then
+        -- an order was left half done (to play the daily, say): it is still on the bench
+        buttons[#buttons + 1] = { "Resume order #" .. (db.run.level or db.level), function() self:ResumeOrder() end, g.state == "play" and "ghost" or nil }
+    else
+        buttons[#buttons + 1] = { inOrder and ("Order #" .. db.level) or ("Work Order #" .. db.level), function() self:StartOrder(db.level) end, g.state == "play" and "ghost" or nil }
+    end
     buttons[#buttons + 1] = { "Daily Commission", function() self:Begin("daily", { day = Today() }) end }
     buttons[#buttons + 1] = { "Gem Rush", function() self:Begin("rush", { seed = floor((self.rt or 0) * 1000) + 1 }) end }
     buttons[#buttons + 1] = { "Order book", function() self:ShowOrders() end }

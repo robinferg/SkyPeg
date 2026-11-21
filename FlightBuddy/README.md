@@ -11,9 +11,31 @@ Tavern Talk with the latest scores from your friends and guild.
 | **Featherbeard** | Thread a Wildhammer gryphon between the pillars of Dun Morogh. Free flights and a daily run with a ghost of your best. |
 | **High Tinker Pinball** | Gnome-engineered pinball in Tinker Town, with jobs from Mekkatorque, gizmos and a 3-ball Air Show. |
 | **Jewelcrafter's Bench** | Match-3 gem cutting: Work Orders (a campaign with stars), a Daily Commission everyone plays, and 90-second Gem Rush. |
+| **The Great Forge** | Slide and smelt: two bars of the same metal make the next, from Copper all the way to Arcanite. Free forges with two Reheats, and a Daily Smelt everyone plays. |
+| **Goblin Minefield** | Dig everything but the mines, against the clock. Three field sizes, a Gnomish Mine Detector, and a Daily Sweep everyone plays. |
+| **Death Roll** | One-on-one death rolls with a wager, played out as a fight in the Brawler's Pit. |
 
 Every game opens on its own menu: play or resume, pick your hero / gryphon / table crew / ball and putter / bench cloth,
 leaderboards, how to play, and options.
+
+## The Great Forge
+Slide every bar on the anvil one way (arrow keys or WASD, drag across the anvil, or click near an edge). Two bars of the
+same metal that meet smelt into one bar of the next: Copper, Tin, Bronze, Silver, Iron, Gold, Steel, Mithril, Truesilver,
+Thorium, Arcanite. A new Copper bar drops in after every move; when the anvil is full and nothing will smelt, the forge
+goes cold.
+- **Reheat** takes back your last move, twice a forge (it can bring a cold forge back to life).
+- The forge is saved after every move: close the window whenever you land and carry on next flight.
+- **Daily Smelt:** the same bars for everyone, 200 strikes, highest score wins.
+- The keys only belong to the forge on a flight or while the pointer is over the window, so you can still walk about.
+
+## Goblin Minefield
+Dig every square that has no mine under it. A dug square shows how many of the eight squares round it are mined.
+- **Left click** digs. **Right click** plants a flag (Shift-click, or the Flags button, does the same for trackpads).
+- Click a **number** that already has that many flags round it to dig the rest at once.
+- The first dig is always safe. The **Detector** rings one safe square, once a field, for 10 seconds on your clock.
+- Three fields: Scrap Heap (9 x 9, 10 mines), Proving Grounds (12 x 12, 22) and No Man's Land (16 x 16, 48).
+- **Daily Sweep:** one field for everyone with the first hole already dug. Each time it blows up adds 30 seconds to your
+  next try, and your first clear is your time for the day.
 
 ## Jewelcrafter's Bench
 Swap two neighbouring gems (click one then the other, or drag) to line up three or more.

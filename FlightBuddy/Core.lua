@@ -22,6 +22,8 @@ local DEFAULTS = {
     flap = {},
     pin = {},
     gem = {},
+    forge = {},
+    mines = {},
     boards = {},
 }
 
@@ -46,7 +48,7 @@ local function Setup()
     Merge(db, DEFAULTS)
     NS.db = db
     -- games read shared settings through their own sub-table (never saved twice)
-    for _, k in ipairs({ "peg", "putt", "flap", "pin", "gem" }) do
+    for _, k in ipairs({ "peg", "putt", "flap", "pin", "gem", "forge", "mines" }) do
         setmetatable(db[k], { __index = function(_, key) if key == "settings" then return db.settings end end })
     end
     NS.Social:Init(db)
@@ -57,6 +59,8 @@ local function Setup()
     NS.FlapUI:Init(db.flap)
     NS.PinballUI:Init(db.pin)
     NS.GemsUI:Init(db.gem)
+    NS.ForgeUI:Init(db.forge)
+    NS.MinesUI:Init(db.mines)
     NS.Shell:Init(db)
 end
 
@@ -178,8 +182,16 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
             end
         end
     elseif event == "PLAYER_LOGOUT" then
-        if NS.db and NS.Shell.frame and NS.Shell:IsShown() then
-            for _, m in pairs(NS.Shell.mods) do if m.frame and m.OnHide then m:OnHide() end end
+        -- last chance to write things down. Each game is asked on its own, so one that trips
+        -- cannot stop the others from saving.
+        if NS.db and NS.Shell.frame then
+            local open = NS.Shell:IsShown()
+            for _, m in pairs(NS.Shell.mods) do
+                if m.frame then
+                    if open and m.OnHide then pcall(m.OnHide, m) end
+                    if m.OnLogout then pcall(m.OnLogout, m) end
+                end
+            end
         end
     elseif event == "PLAYER_REGEN_DISABLED" then
         if NS.db then
@@ -237,7 +249,7 @@ end)
 local function Help()
     NS.Print("commands:")
     print("  |cffffcc40/fb|r  open or close Flight Buddy")
-    print("  |cffffcc40/fb peg|r, |cffffcc40/fb putt|r, |cffffcc40/fb flap|r, |cffffcc40/fb pin|r  jump to a game")
+    print("  |cffffcc40/fb peg|r, |cffffcc40/fb putt|r, |cffffcc40/fb gem|r, |cffffcc40/fb forge|r, |cffffcc40/fb mines|r, |cffffcc40/fb roll|r, |cffffcc40/fb flap|r, |cffffcc40/fb pin|r  jump to a game")
     print("  |cffffcc40/fb options|r  settings (auto-open on flights, sharing, sound, size...)")
     print("  |cffffcc40/fb test|r  preview the take-off prompt")
     print("  |cffffcc40/fb resetpos|r  move the window back to the middle")
@@ -249,6 +261,8 @@ local TAB_ALIASES = { peg = "peg", skypeg = "peg", peggle = "peg",
     pin = "pin", pinball = "pin", tinker = "pin", hightinker = "pin",
     roll = "roll", deathroll = "roll", dice = "roll",
     gem = "gem", gems = "gem", jewel = "gem", jewelcrafter = "gem", match = "gem",
+    forge = "forge", smelt = "forge", bars = "forge", anvil = "forge", ["2048"] = "forge",
+    mines = "mines", mine = "mines", minefield = "mines", sweeper = "mines", minesweeper = "mines", goblin = "mines",
     home = "home", tavern = "home" }
 
 local function Slash(msg, forceTab)

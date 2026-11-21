@@ -1,6 +1,22 @@
 # Flight Buddy changelog
 
-## 2.3.1
+## 2.4.0
+
+**Two new games: The Great Forge and Goblin Minefield.** Both have a daily everyone plays, leaderboards, and a game that is saved after every move.
+
+- **The Great Forge.** Slide the bars on the anvil; two of the same metal smelt into the next one up, with the real bar icons: Copper, Tin, Bronze, Silver, Iron, Gold, Steel, Mithril, Truesilver, Thorium and at last Arcanite (and there is more past Arcanite for anyone who gets there). Arrow keys or WASD, drag across the anvil, or click near an edge. Two Reheats a forge take back your last move. The Daily Smelt gives everyone the same bars and 200 strikes
+- **Goblin Minefield.** Dig every square that has no mine under it, against the clock. Three fields (9 x 9, 12 x 12 and 16 x 16), a first dig that is always safe, flags with a right click, and a click on a number to dig round it once its flags are down. One Gnomish Mine Detector a field rings a safe square for ten seconds on your clock. The Daily Sweep is one field for everyone with the first hole already dug: each time it blows up adds 30 seconds to your next try, and your first clear is your time for the day
+- **The Tavern has room for them.** The games people play most now stand at the front: Rune Breaker, Gryphon Greens, Jewelcrafter's Bench, The Great Forge, Goblin Minefield and Death Roll, with Featherbeard and Pinball on the second page. `/fb forge` and `/fb mines` jump straight in
+
+**Nothing you have earned gets lost.**
+
+- **Gryphon Greens** writes your round down at every hole and every stroke, not only when the window closes, so a crash or a dropped connection costs one shot at most
+- **Featherbeard:** a flight cut short because the window closed (you landed, or combat started) now counts as a finished flight, record and all
+- **High Tinker Pinball:** logging out or reloading with a game on the table banks the score so far
+- **Jewelcrafter's Bench:** a Work Order you left half done to play the daily is offered again on the menu
+- Every game is asked to save on its own at logout, so one that trips can no longer stop the others
+
+**Also in this version** (2.3.1 was never released on its own):
 
 - **Gryphon Greens: the slopes mean it now.** Leaning greens are much steeper, close to the steepest a ball can still stop on, so a soft putt breaks about twice as far as a firm one: hit hard through the break, or play it soft and let the green carry it. Climbs are far taller and longer: a normal putt dies on the way up and rolls back, so a big hill has to be hit like one. Every hole re-tested and given a new par
 - **Rune Breaker no longer loses your run.** Closing the window while the first ball of a session was still in flight (a flight landing mid-shot did it) saved nothing, and the next login started you again at level 1. A run now survives closing or logging out at any moment
