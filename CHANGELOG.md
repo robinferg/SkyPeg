@@ -1,5 +1,11 @@
 # Flight Buddy changelog
 
+## 2.3.1
+
+- **Death Roll: an accepted challenge now starts on both screens.** The challenger could be left on "Waiting for ... to accept" while the other player was already in the game, because the two games spelled the realm differently and so did not recognise each other. Flight Buddy now learns how the server writes your realm a few seconds after login, recognises the answer to a challenge it just sent, repeats an accept until the other game confirms it, and retries a whisper the server could not deliver. The same fix applies to golf Versus invites
+- **Death Roll shows your opponent's character.** When they are standing with you the pit shows them exactly as they are. When they are somewhere else it now shows their race and what they are wearing, sent with the challenge and remembered for next time, instead of a class crest. `/deathroll look` shows what your opponents will see of you
+- **Updates no longer reset anything.** Best times, route bests and score boards are kept from this version on, whatever changes later
+
 ## 2.3.0
 
 **Gryphon Greens: the whole green rolls.** The small round rises and hollows are gone. Every green is now one surface with its own shape, like a real putting green, and the break itself is the obstacle and the skill shot.

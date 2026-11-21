@@ -61,6 +61,7 @@ function D:Init(db)
     db.dr = db.dr or {}
     local s = db.dr
     s.ledger = s.ledger or {}     -- [player key] = { name =, owe = copper they owe me (negative: I owe them) }
+    s.looks = s.looks or {}       -- [player key] = { race =, sex =, items = { ... }, at =, name = } (see "Looks")
     s.history = s.history or {}   -- newest first
     s.wins, s.losses, s.net = s.wins or 0, s.losses or 0, s.net or 0
     if s.notify == nil then s.notify = true end
@@ -143,6 +144,54 @@ function D.UnitFor(full)
 end
 
 ---------------------------------------------------------------------------
+-- Looks: what a player's character looks like (race, sex and what they are wearing), so the pit can
+-- show them when they are not standing next to you. Each player sends their own with a challenge
+-- or an accept; it is kept between sessions, so the next duel shows them straight away.
+---------------------------------------------------------------------------
+-- head, shoulders, back, chest, shirt, tabard, wrists, hands, waist, legs, feet, main hand, off hand, ranged
+local LOOK_SLOTS = { 1, 3, 15, 5, 4, 19, 9, 10, 6, 7, 8, 16, 17, 18 }
+local RACE_ID = { Human = 1, Orc = 2, Dwarf = 3, NightElf = 4, Scourge = 5, Tauren = 6, Gnome = 7, Troll = 8, Goblin = 9, BloodElf = 10, Draenei = 11 }
+D.LOOK_SLOTS = LOOK_SLOTS
+
+function D.MyLook()
+    local _, raceFile, raceID
+    if UnitRace then _, raceFile, raceID = UnitRace("player") end
+    raceID = raceID or RACE_ID[raceFile or ""] or 1
+    local sex = (UnitSex and UnitSex("player")) or 2      -- 2 male, 3 female
+    local items = {}
+    for i, slot in ipairs(LOOK_SLOTS) do items[i] = (GetInventoryItemID and GetInventoryItemID("player", slot)) or 0 end
+    return { race = raceID, sex = sex == 3 and 3 or 2, items = items, at = time() }
+end
+
+local function LookFields(l) return l.race, l.sex, table.concat(l.items, ".") end
+local function SendLook(to, id) Whisper(to, "L", id, LookFields(D.MyLook())) end
+
+function D:Look(key) return key and self.db.looks and self.db.looks[key] or nil end
+
+function D:StoreLook(skey, name, race, sex, itemText)
+    race, sex = tonumber(race), tonumber(sex)
+    if not race or race < 1 or race > 99 or race ~= floor(race) or (sex ~= 2 and sex ~= 3) or type(itemText) ~= "string" then return end
+    local items, n = {}, 0
+    for v in itemText:gmatch("[^%.]+") do
+        n = n + 1
+        if n > #LOOK_SLOTS then break end
+        local id = tonumber(v)
+        items[n] = (id and id >= 0 and id < 10000000 and id == floor(id)) and id or 0
+    end
+    for i = n + 1, #LOOK_SLOTS do items[i] = 0 end
+    local looks = self.db.looks
+    looks[skey] = { race = race, sex = sex, items = items, at = time(), name = name }
+    -- keep the 150 most recent
+    local count, oldest, oldKey = 0, nil, nil
+    for k, l in pairs(looks) do
+        count = count + 1
+        if not oldest or (l.at or 0) < oldest then oldest, oldKey = l.at or 0, k end
+    end
+    if count > 150 and oldKey and oldKey ~= skey then looks[oldKey] = nil end
+    self:Changed()
+end
+
+---------------------------------------------------------------------------
 -- A game (mine, or one I am watching)
 ---------------------------------------------------------------------------
 local function NewGame(id, aFull, bFull, aClass, bClass, wager, start)
@@ -214,6 +263,17 @@ function D:TidyNames()
         e.name = Norm(e.name)
         if led[m[2]] then led[m[2]].owe = (led[m[2]].owe or 0) + (e.owe or 0) else led[m[2]] = e end
     end
+    -- saved looks follow their owner to the one spelling too
+    local looks, lm = self.db.looks, nil
+    for key, l in pairs(looks or {}) do
+        local to = type(l) == "table" and l.name and Key(l.name)
+        if to and to ~= key then lm = lm or {}; lm[#lm + 1] = { key, to } end
+    end
+    for _, m in ipairs(lm or {}) do
+        local l = looks[m[1]]
+        looks[m[1]] = nil
+        if not looks[m[2]] or (looks[m[2]].at or 0) < (l.at or 0) then looks[m[2]] = l end
+    end
 end
 
 function D:Entry(full)
@@ -256,6 +316,7 @@ function D:Challenge(name, wagerCopper, start)
     self.game = g
     self.db.start, self.db.lastWager = start, wagerCopper
     Whisper(name, "C", g.id, wagerCopper, start, MyClass())
+    SendLook(name, g.id)
     self:Changed()
     return true
 end
@@ -278,6 +339,9 @@ function D:Accept()
     local g = NewGame(inv.id, inv.from, MeName(), inv.class, MyClass(), inv.wager, inv.start)
     self.game = g
     Whisper(inv.from, "A", inv.id, MyClass())
+    g.ackWait = { n = 0, at = GetTime() }   -- said again (see Pump) until the challenger's game says it heard
+    SendLook(inv.from, inv.id)
+    Broadcast("L", inv.id, LookFields(D.MyLook()))
     if self.onOpen then self.onOpen() end
     self:Changed()
 end
@@ -307,6 +371,8 @@ end
 local function StartRound(self, g)
     Broadcast("G", g.id, g.name[g.a], g.name[g.b], g.class[g.a], g.class[g.b], (g.owed and g.round > 1) and g.owed.amount * 2 or g.wager, g.start, g.round,
         g.name[g.turn], g.seq)
+    -- and what I look like, for anyone watching
+    if g.round == 1 then Broadcast("L", g.id, LookFields(D.MyLook())) end
 end
 
 -- my own roll or my opponent's, however it reached me
@@ -477,6 +543,18 @@ function D:OnMessage(prefix, text, channel, sender)
     local cmd, id = a[1], a[2]
     if not cmd or not id then return end
 
+    -- what the sender's character looks like: from my opponent, from whoever is challenging me, or
+    -- (on the guild or group channel) from the players of a death roll I can watch
+    if cmd == "L" then
+        local g = self.game
+        local known = (g and (skey == g.a or skey == g.b)) or (self.invite and Key(self.invite.from) == skey)
+        if not known and channel ~= "WHISPER" then
+            for _, w in pairs(self.watch) do if skey == w.a or skey == w.b then known = true end end
+        end
+        if known or self:Trusted(sender) then self:StoreLook(skey, sender, a[3], a[4], a[5]) end
+        return
+    end
+
     if channel ~= "WHISPER" then return self:OnWatch(cmd, id, a, sender, skey) end
 
     local g = self.game
@@ -509,8 +587,11 @@ function D:OnMessage(prefix, text, channel, sender)
     end
     if not g or g.id ~= id or (skey ~= g.a and skey ~= g.b) then return end
     g.name[skey] = sender
+    g.ackWait = nil   -- anything from my opponent about this game means theirs is running
+    if cmd == "K" then return end
 
     if cmd == "A" then
+        if skey == g.b then Whisper(sender, "K", id) end   -- heard you (an accept said twice is answered twice)
         if g.state == "pending" and skey == g.b then
             g.class[g.b] = cls(a[3])
             g.state, g.began, g.last = "play", GetTime(), GetTime()
@@ -653,6 +734,15 @@ function D:Pump(el)
     if self.trade and self.trade.closedAt and now - self.trade.closedAt > 3 then self.trade = nil end
     if self.invite and now - self.invite.at > INVITE_SECS then self.invite = nil end
     local g = self.game
+    if g and g.ackWait and now - g.ackWait.at > 4 then
+        -- my accept has not been acknowledged: say it again, three times at most
+        if g.ackWait.n < 3 and g.state == "play" and g.seq == 0 then
+            g.ackWait.n, g.ackWait.at = g.ackWait.n + 1, now
+            Whisper(g.name[g.a], "A", g.id, MyClass())
+        else
+            g.ackWait = nil
+        end
+    end
     if g then
         if g.state == "pending" and now - g.sentAt > INVITE_SECS then
             self.game = nil
@@ -671,6 +761,7 @@ function D:Slash(msg)
     local lc = (cmd or ""):lower()
     if lc == "accept" then self:Accept(); return end
     if lc == "decline" then self:Decline(); return end
+    if lc == "look" then if self.onLookTest then self.onLookTest() end; return end
     if lc ~= "" then
         -- "Name [gold]" or "First Last [gold]"
         local whole = (msg or ""):match("^%s*(.-)%s*$")

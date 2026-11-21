@@ -77,6 +77,7 @@ function UI:Init(db)
     self.db = db
     D.onChange = function() if self:Visible() then self:Refresh() end end
     D.onOpen = function(lobby) self:Open() end
+    D.onLookTest = function() self:LookTest() end
     D.onRound = function(g) self:ResetDisplay(g) end
     D.onRoll = function(g, e, mine) self:OnRoll(g, e, mine) end
     D.onNotice = function(w) self:Notice(w) end
@@ -88,8 +89,11 @@ local function Fighter(arena, x, flip)
     f.shadow = W.Tex(arena, "ARTWORK", "glow", 0)
     f.shadow:SetSize(120, 26); f.shadow:SetVertexColor(0, 0, 0, 0.5)
     f.shadow:SetPoint("CENTER", arena, "TOPLEFT", x, -FLOOR_Y)
-    -- the player's real character when the game can show it
-    local ok, m = pcall(CreateFrame, "PlayerModel", nil, arena)
+    -- the player's real character when the game can show it: a dressing-room model if the game has
+    -- one (it can be given another player's race and clothes), a plain model otherwise
+    local ok, m = pcall(CreateFrame, "DressUpModel", nil, arena)
+    f.kind = "DressUpModel"
+    if not (ok and m) then ok, m = pcall(CreateFrame, "PlayerModel", nil, arena); f.kind = "PlayerModel" end
     if ok and m then
         m:SetSize(190, 250)
         m:SetPoint("BOTTOM", arena, "TOPLEFT", x, -FLOOR_Y - 8)
@@ -514,23 +518,64 @@ end
 ---------------------------------------------------------------------------
 -- Fighters
 ---------------------------------------------------------------------------
-function UI:SetFighter(i, g, key)
+-- Dress a model as another player from their saved look. True if the game could do it.
+local SLOT_NAME = { [16] = "MAINHANDSLOT", [17] = "SECONDARYHANDSLOT" }
+local function DressAs(m, look, again)
+    if not (m and look and m.TryOn and m.Undress) then return false end
+    local mine = D.MyLook()
+    local same = mine.race == look.race and mine.sex == look.sex
+    if not m.SetCustomRace and not same then return false end   -- no way to show another race here
+    local ok = pcall(function()
+        if not again then
+            m:ClearModel()
+            m:SetUnit("player")
+            if m.SetCustomRace and not same then m:SetCustomRace(look.race, look.sex - 2) end
+            m:Undress()
+        end
+        for i, slot in ipairs(D.LOOK_SLOTS) do
+            local id = look.items[i]
+            if id and id > 0 then
+                if GetItemInfo then GetItemInfo(id) end   -- asks the server for it if this client has never seen it
+                if SLOT_NAME[slot] then m:TryOn("item:" .. id, SLOT_NAME[slot]) else m:TryOn("item:" .. id) end
+            end
+        end
+    end)
+    return ok
+end
+UI.DressAs = DressAs
+
+function UI:SetFighter(i, g, key, forceLook)
     local f = self.fighters[i]
     local class = g and g.class[key] or "WARRIOR"
-    if f.key == key and f.class == class and f.gameId == (g and g.id) then return end
-    f.key, f.class, f.gameId, f.dead = key, class, g and g.id, false
+    local unit = (not forceLook) and g and D.UnitFor(g.name[key]) or nil
+    local live = unit and (unit == "player" or not UnitIsVisible or UnitIsVisible(unit)) and true or false
+    local look = (not live) and (forceLook or D:Look(key)) or nil
+    local sig = live and ("u:" .. unit) or (look and ("l:" .. tostring(look.at))) or "c"
+    if f.key == key and f.class == class and f.gameId == (g and g.id) and f.sig == sig then return end
+    f.key, f.class, f.gameId, f.dead, f.sig = key, class, g and g.id, false, sig
     f.tomb:Hide()
-    local unit = g and D.UnitFor(g.name[key])
     local shown = false
-    if f.model and unit and not NS.db.settings.reducedMotion then
-        local ok = pcall(function()
-            f.model:ClearModel()
-            f.model:SetUnit(unit)
-            f.model:SetFacing(f.flip and -0.75 or 0.75)
-            if f.model.SetCamDistanceScale then f.model:SetCamDistanceScale(1.35) end
-            f.model:SetAnimation(0)
-        end)
-        shown = ok and (unit == "player" or not UnitIsVisible or UnitIsVisible(unit)) and true or false
+    f.redress = nil
+    if f.model and not NS.db.settings.reducedMotion then
+        if live then
+            -- standing where I can see them: the game shows them exactly as they are
+            shown = pcall(function()
+                f.model:ClearModel()
+                f.model:SetUnit(unit)
+            end)
+        elseif look then
+            -- somewhere else: their race and what they wore when they last sent it
+            shown = DressAs(f.model, look)
+            -- items this client has never seen arrive a moment later: dress again then
+            if shown then f.redress = { look = look, at = { 1.2, 4 }, t = 0 } end
+        end
+        if shown then
+            pcall(function()
+                f.model:SetFacing(f.flip and -0.75 or 0.75)
+                if f.model.SetCamDistanceScale then f.model:SetCamDistanceScale(1.35) end
+                f.model:SetAnimation(0)
+            end)
+        end
     end
     f.useModel = shown
     if f.model then f.model:SetShown(shown) end
@@ -538,6 +583,24 @@ function UI:SetFighter(i, g, key)
     if not shown then
         SetCrest(f.crest, class)
     end
+end
+
+-- /deathroll look: can this game show another player from a saved look? Says what it found in chat
+-- and stands your own character in the pit twice for a while: on the left as the game shows you,
+-- on the right rebuilt from the look your opponents receive.
+function UI:LookTest()
+    self:Open()
+    local f = self.fighters and self.fighters[2]
+    local m = f and f.model
+    local look = D.MyLook()
+    local worn = 0
+    for _, id in ipairs(look.items) do if id > 0 then worn = worn + 1 end end
+    NS.Print(("Character models: %s. Another race: %s. Dressing: %s. Your look: race %d, %s, %d pieces."):format(
+        m and f.kind or "none", (m and m.SetCustomRace) and "yes" or "no", (m and m.TryOn and m.Undress) and "yes" or "no",
+        look.race, look.sex == 3 and "female" or "male", worn))
+    if D:Busy() then NS.Print("Finish your Death Roll first to see the test."); return end
+    self.lookTest = { look = look, t = 20 }
+    self:Refresh(true)
 end
 
 function UI:Anim(i, id)
@@ -753,6 +816,22 @@ function UI:OnUpdate(el)
     self:UpdateCoins(el)
     self:UpdateMarks()
     if self.hintT then self.hintT = self.hintT - el; if self.hintT <= 0 then self.hint, self.hintT = nil, nil; self:Refresh() end end
+    if self.lookTest then
+        self.lookTest.t = self.lookTest.t - el
+        if self.lookTest.t <= 0 or D:Busy() then self.lookTest = nil; self:Refresh(true) end
+    end
+    -- a fighter dressed from a saved look is dressed again once the game has fetched their items
+    for _, ft in ipairs(self.fighters or {}) do
+        local rd = ft.redress
+        if rd then
+            rd.t = rd.t + el
+            if rd.at[1] and rd.t >= rd.at[1] then
+                table.remove(rd.at, 1)
+                if ft.useModel then DressAs(ft.model, rd.look, true) end
+                if not rd.at[1] then ft.redress = nil end
+            end
+        end
+    end
     if self.flashT then
         self.flashT = self.flashT - el
         self.flash:SetColorTexture(1, 1, 1, max(0, self.flashT) * 1.2)
@@ -969,7 +1048,7 @@ function UI:Refresh(reset)
     self.ledger:SetShown(ledger); self.ledgerBack:SetShown(ledger)
     if ledger then self:DrawLedger() else for _, b in ipairs(self.ledgerRows) do b:Hide() end end
     self.ledgerBtn.text:SetText(ledger and "Back" or "Ledger")
-    local lobby = not g and not pend and not ledger
+    local lobby = not g and not pend and not ledger and not self.lookTest
     self.lobby:SetShown(lobby)
     local inGame = g and not ledger
     self.plaque:SetShown(inGame and true or false); self.number:SetShown(inGame and true or false); self.range:SetShown(inGame and true or false)
@@ -999,10 +1078,17 @@ function UI:Refresh(reset)
     else
         self.stake:SetText(""); self.round:SetText(""); self.pot:Hide()
         -- nobody in the pit yet
-        for _, ft in ipairs(self.fighters) do
-            if ft.model then ft.model:Hide() end
-            ft.crest:Hide(); ft.tomb:Hide(); ft.shadow:Hide()
-            ft.key, ft.gameId = nil, nil
+        if self.lookTest and not pend then
+            local fake = { id = "looktest", name = { [me] = UnitName("player") }, class = { [me] = select(2, UnitClass("player")) } }
+            self:SetFighter(1, fake, me)
+            self:SetFighter(2, fake, me, self.lookTest.look)
+            for _, ft in ipairs(self.fighters) do ft.shadow:Show() end
+        else
+            for _, ft in ipairs(self.fighters) do
+                if ft.model then ft.model:Hide() end
+                ft.crest:Hide(); ft.tomb:Hide(); ft.shadow:Hide()
+                ft.key, ft.gameId, ft.sig = nil, nil, nil
+            end
         end
         self.lines = {}
         self.log:SetText("|cff9499b3The play-by-play of each roll shows here.|r")
@@ -1106,6 +1192,10 @@ function UI:Refresh(reset)
         if w and w.state == "play" and GetTime() - w.last < 180 then
             btns = { { ("Watch %s vs %s"):format(D.Short(w.name[w.a]), D.Short(w.name[w.b])), function() self.watchId = wid; self:Refresh(true) end } }
         end
+    end
+    if self.lookTest and not g and not pend then
+        status = "Left: you, as the game shows you.  Right: you, rebuilt from the look your opponents receive."
+        btns = { { "Done", function() self.lookTest = nil; self:Refresh(true) end, "ghost" } }
     end
     self.status:SetText(status)
     self:SetButtons(btns)

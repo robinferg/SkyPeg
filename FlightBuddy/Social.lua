@@ -147,26 +147,70 @@ function Social.LearnRealm(r)
     Social.needTidy = true
 end
 
--- Our own messages come back to us on shared channels, signed the way the server writes us: that
--- is how the server's spelling of our realm is learned. (Only our own echo is trusted for this; a
--- guild or a group can hold players from other realms.)
+-- How the server's spelling of our realm is learned. Only evidence that can come from our own realm
+-- alone is trusted (a guild or a group can hold players from other realms):
+--   * our own messages coming back to us on a shared channel, signed the way the server writes us
+--   * a whisper to ourselves, sent a few seconds after login (so nobody has to be in a guild or a
+--     group first), recognised by a number only we know
+--   * an answer from a player we whispered by bare name a moment ago: a bare name only reaches our realm
+--   * a whisper from somebody standing in our group whom the game itself lists without a realm
 local ECHO = { GUILD = true, PARTY = true, RAID = true, CHANNEL = true, INSTANCE_CHAT = true, OFFICER = true }
-function Social.Hear(channel, sender)
-    if type(sender) ~= "string" or not ECHO[channel] then return end
+local whispered = {}       -- [name as whispered, lower case] = { at =, bare =, prefix =, text =, retried = }
+local probeKey
+local function Now() return (GetTime and GetTime()) or 0 end
+
+local function GroupmateOnOurRealm(n)
+    if not (UnitName and UnitExists) then return false end
+    local function is(unit)
+        if not UnitExists(unit) then return false end
+        local un, ur = UnitName(unit)
+        return un == n and (ur == nil or ur == "")
+    end
+    if IsInRaid and IsInRaid() then
+        for i = 1, 40 do if is("raid" .. i) then return true end end
+    else
+        for i = 1, 4 do if is("party" .. i) then return true end end
+    end
+    return false
+end
+
+function Social.Hear(channel, sender, prefix, text)
+    if type(sender) ~= "string" then return end
     local n, r = Split(sender)
+    local me = UnitName and UnitName("player")
+    if channel == "WHISPER" and probeKey and prefix == PREFIX and text == "~realm," .. probeKey and n == me then
+        Social.probed = true
+        if r then Social.LearnRealm(r) end
+        return
+    end
     if not r or OurRealm(r) then return end
-    if n == (UnitName and UnitName("player")) then Social.LearnRealm(r) end
+    if ECHO[channel] then
+        if n == me then Social.LearnRealm(r) end
+    elseif channel == "WHISPER" then
+        local w = whispered[n:lower()]
+        if (w and w.bare and Now() - w.at < 90) or GroupmateOnOurRealm(n) then Social.LearnRealm(r) end
+    end
+end
+
+-- Ask the server how it writes us: whisper ourselves. Tried a few times after login (see Pump).
+function Social.ProbeRealm()
+    local me = UnitName and UnitName("player")
+    if not me or not (C_ChatInfo and C_ChatInfo.SendAddonMessage) then return end
+    probeKey = probeKey or tostring(math.random(100000, 999999))
+    whispered[me:lower()] = { at = Now(), bare = false, retried = true }   -- a "no player named" for it stays out of chat
+    pcall(C_ChatInfo.SendAddonMessage, PREFIX, "~realm," .. probeKey, "WHISPER", me)
 end
 
 -- Every addon message Flight Buddy sends goes through here: whispers go to a name the server can
 -- find, never to ourselves, and are remembered briefly so a "no player named" reply for one of
--- them (they logged off a moment ago) is kept out of the chat window.
-local whispered = {}
+-- them (they logged off a moment ago) is kept out of the chat window, and so a whisper that could
+-- not be delivered under a realm spelling we were not sure of can be sent again by bare name.
 function Social.Deliver(prefix, text, chatType, target)
     if chatType == "WHISPER" then
         if type(target) ~= "string" or target == "" or Social.IsMe(target) then return end
         target = Social.Target(target)
-        whispered[target:lower()] = (GetTime and GetTime()) or 0
+        local _, r = Split(target)
+        whispered[target:lower()] = { at = Now(), bare = r == nil, prefix = prefix, text = text }
     end
     if C_ChatInfo and C_ChatInfo.SendAddonMessage then pcall(C_ChatInfo.SendAddonMessage, prefix, text, chatType, target) end
 end
@@ -178,8 +222,18 @@ local function QuietFilter()
     ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", function(_, _, msg)
         if type(msg) ~= "string" then return false end
         local who = msg:match(pat)
-        local at = who and (whispered[who:lower()] or whispered[Social.Target(who):lower()])
-        if at and ((GetTime and GetTime()) or 0) - at < 8 then return true end
+        local w = who and (whispered[who:lower()] or whispered[Social.Target(who):lower()])
+        if w and Now() - w.at < 8 then
+            -- nobody by that name on that realm: if the realm was a spelling we did not know, it may
+            -- be our own, so the message goes once more by bare name
+            local n, r = Split(who)
+            if r and not w.retried and w.prefix and not OurRealm(r) then
+                w.retried = true
+                whispered[n:lower()] = { at = Now(), bare = true, prefix = w.prefix, text = w.text, retried = true }
+                if C_ChatInfo and C_ChatInfo.SendAddonMessage then pcall(C_ChatInfo.SendAddonMessage, w.prefix, w.text, "WHISPER", n) end
+            end
+            return true
+        end
         return false
     end)
 end
@@ -204,15 +258,18 @@ function Social:Init(db)
         C_ChatInfo.RegisterAddonMessagePrefix(PREFIX)
     end
     self.joinAt = 12   -- join the realm channel a little after login, once chat is ready
+    self.probeIn = { 5, 20, 90 }   -- seconds from now at which to ask the server how it spells our realm
+    self.probeClock = 0
     local known = db.realmNames and db.realmNames[(GetRealmName and GetRealmName()) or "?"]
     for r in pairs(known or {}) do ourRealms[r] = true end
     QuietFilter()
     self:Tidy()
-    -- times heard before the holes were made harder go (see GOLF_REV)
-    if db.golfRev ~= GOLF_REV then
-        db.golfRev = GOLF_REV
+    -- Boards are never cleared by an update. The one exception, long past: golf times heard before
+    -- 2.2 (no scoring floor: whole routes in 0 seconds) were dropped once.
+    if db.golfRev == nil then
         for game in pairs(db.boards or {}) do if IsGolf(game) then db.boards[game] = nil end end
     end
+    db.golfRev = GOLF_REV
 end
 
 -- Results stored under another spelling of our realm are moved to the one spelling we use; any that
@@ -299,6 +356,13 @@ function Social:Pump(el)
     if self.joinAt then
         self.joinAt = self.joinAt - el
         if self.joinAt <= 0 then self.joinAt = nil; self:JoinRealm() end
+    end
+    if self.probeIn and self.probeIn[1] then
+        self.probeClock = self.probeClock + el
+        if self.probeClock >= self.probeIn[1] then
+            table.remove(self.probeIn, 1)
+            if Social.probed then self.probeIn = nil else Social.ProbeRealm() end
+        end
     end
     if Social.needTidy then self:Tidy() end
     sendAcc = sendAcc + el
@@ -457,7 +521,12 @@ function Social:RefreshPeople(force)
         if C_GuildInfo and C_GuildInfo.GuildRoster then pcall(C_GuildInfo.GuildRoster) elseif GuildRoster then pcall(GuildRoster) end
         for i = 1, GetNumGuildMembers() or 0 do
             local name = GetGuildRosterInfo(i)
-            if name then guildSet[Key(name)] = true; guildSet[name:lower()] = true end
+            if name then
+                guildSet[Key(name)] = true; guildSet[name:lower()] = true
+                -- our own line in the roster is written the server's way too
+                local n, r = Split(name)
+                if r and n == (UnitName and UnitName("player")) then Social.LearnRealm(r) end
+            end
         end
     end
 end
