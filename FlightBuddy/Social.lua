@@ -20,6 +20,7 @@ Social.GAMES = {
     rb = "high", flap = "high", flapd = "high", pin = "high", tram = "high",
     gem = "high", gemd = "high", gemw = "high",
     ob = "high", obd = "high",
+    pl = "low", pld = "low",
 }
 -- Gryphon Greens quick rounds: one board per course (best time, lower wins)
 for _, k in ipairs({ "human", "dwarf", "gnome", "nelf", "orc", "troll", "undead", "mulgore", "arathi", "tour" }) do

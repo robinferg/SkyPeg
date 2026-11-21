@@ -2,13 +2,23 @@
 
 ## 2.4.0
 
-**New game: Orb Cannon.** Aim with the pointer and fire orbs up into the ceiling; they bank off the side walls. Three or more of a kind that touch burst, and anything left hanging from nothing falls, which is where the big points are.
+**Two new games: Orb Cannon and Tavern Pool.**
+
+**Orb Cannon.** Aim with the pointer and fire orbs up into the ceiling; they bank off the side walls. Three or more of a kind that touch burst, and anything left hanging from nothing falls, which is where the big points are.
 
 - A shot that bursts nothing is a miss; run out of misses and the ceiling comes down a row. It is over when the orbs reach the line
 - Right-click (or click the waiting orb) to swap it into the cannon
 - Bursting shots in a row build a streak multiplier. Four in a row loads a Prismatic Orb that matches anything; dropping six at once loads a Goblin Bomb
 - Endless waves that get harder, and a Daily Salvo: one board for everyone, cleared in as few shots as you can
 - Leaderboards for both, and the game is saved after every shot. `/fb orbs` jumps straight in
+
+**Tavern Pool.** Eight-ball on a proper table: sixteen balls, six pockets, cushions with jaws, and the rules of the game.
+
+- Point to aim; the line shows what the cue ball will strike and which way that ball sets off. Press, pull back along the cue for power, and let go. The mouse wheel turns the aim a hair
+- Three regulars to play, from the Barkeep to the Hustler. Pot the first ball after the break to take solids or stripes, clear yours, then the eight
+- Fouls give the other player the cue ball in hand
+- A Solo table and a Daily Table (the same balls for everyone): clear them in the fewest shots, with leaderboards for both
+- Saved after every shot, even with the balls still rolling. `/fb pool` jumps straight in
 
 **Nothing you have earned gets lost.**
 

@@ -12,6 +12,7 @@ Tavern Talk with the latest scores from your friends and guild.
 | **High Tinker Pinball** | Gnome-engineered pinball in Tinker Town, with jobs from Mekkatorque, gizmos and a 3-ball Air Show. |
 | **Jewelcrafter's Bench** | Match-3 gem cutting: Work Orders (a campaign with stars), a Daily Commission everyone plays, and 90-second Gem Rush. |
 | **Orb Cannon** | Fire orbs into the ceiling, match three of a kind and bring whole clusters down. Endless waves and a Daily Salvo everyone plays. |
+| **Tavern Pool** | Eight-ball against three tavern regulars, with real ball physics. A Solo table and a Daily Table everyone plays, fewest shots wins. |
 | **Death Roll** | One-on-one death rolls with a wager, played out as a fight in the Brawler's Pit. |
 
 Every game opens on its own menu: play or resume, pick your hero / gryphon / table crew / ball and putter / bench cloth,
@@ -27,6 +28,17 @@ anything left hanging from nothing falls. Falling orbs are worth far more, so cu
   dropping six at once loads a **Goblin Bomb**.
 - **Daily Salvo:** one board for everyone. Clear it in as few shots as you can.
 - The game is saved after every shot.
+
+## Tavern Pool
+The table stands the long way up and you shoot from the bottom.
+- **Aim** by pointing where the cue ball should go. The line shows what it will strike and which way that ball sets off.
+  The mouse wheel turns the aim a hair (hold Shift for a finer one).
+- **Shoot:** press, pull back along the cue for power, and let go. Right-click lets the cue down without shooting.
+- **Eight-ball:** the first ball you pot after the break makes you solids or stripes. Pot all seven, then the eight.
+  Pot one of yours and you shoot again. A foul (the cue ball down a pocket, nothing struck, the wrong ball struck first)
+  gives the other player the cue ball in hand. The eight down too soon loses the frame.
+- Three regulars: the Barkeep, the Brawler and the Hustler.
+- **Solo table** and **Daily Table:** clear every ball in as few shots as you can; a foul costs a shot.
 
 ## Jewelcrafter's Bench
 Swap two neighbouring gems (click one then the other, or drag) to line up three or more.

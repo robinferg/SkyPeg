@@ -38,10 +38,12 @@ UI.GAMES = {
       art = "key_greens", mx = 0.5, my = 0.40, tx = 0.60, ty = 0.36, tz = 0.56, board = "putt", daily = true },
     { key = "gem",  name = "Jewelcrafter's Bench", plate = "Jewelcrafter", tag = "Cut gems three in a row.",
       art = "key_gems", mx = 0.5, my = 0.50, tx = 0.40, ty = 0.50, tz = 0.56, board = "gemd", daily = true },
-    -- (Orb Cannon borrows a Rune Breaker backdrop until its own key art is painted: `file` is a
+    -- (Orb Cannon and Tavern Pool borrow Rune Breaker backdrops until their own key art is painted: `file` is a
     -- whole texture path used instead of tavern\\<art>)
     { key = "orbs", name = "Orb Cannon", tag = "Fire, match three, bring them down.",
       file = W.MEDIA .. "pbg_frost_peaks", mx = 0.5, my = 0.45, tx = 0.50, ty = 0.45, tz = 0.70, board = "obd", daily = true },
+    { key = "pool", name = "Tavern Pool", tag = "Eight-ball against the regulars.",
+      file = W.MEDIA .. "pbg_forge_hall", mx = 0.5, my = 0.5, tx = 0.50, ty = 0.50, tz = 0.70, board = "pld", daily = true },
     { key = "roll", name = "Death Roll", tag = "Wager gold on the roll of the dice.",
       art = "key_roll", mx = 0.5, my = 0.60, tx = 0.60, ty = 0.60, tz = 0.60 },
     { key = "flap", name = "Featherbeard", tag = "Fly a gryphon through Dun Morogh.",
@@ -737,6 +739,9 @@ function UI:Played(g)
     elseif g.key == "orbs" then
         local o = db.orbs or {}
         return (o.games or 0) > 0 or o.run ~= nil
+    elseif g.key == "pool" then
+        local p = db.pool or {}
+        return (p.frames or 0) > 0 or (p.bestSolo or 0) > 0 or p.run ~= nil
     elseif g.key == "roll" then
         return db.dr ~= nil and ((db.dr.wins or 0) + (db.dr.losses or 0)) > 0
     end
@@ -776,6 +781,15 @@ function UI:CardStat(g)
         if d and (d.best or 0) > 0 then return "Today " .. W.Short(d.best), "obd", Today() end
         if o.run then return ("Wave %d  |  %s"):format(o.run.level or 1, W.Short(o.run.score or 0)), "obd", Today() end
         return (o.best or 0) > 0 and ("Best " .. W.Short(o.best)) or "Load the cannon", "obd", Today()
+    elseif g.key == "pool" then
+        local P = NS.PoolUI
+        local d = P.db and P:Daily()
+        local p = db.pool or {}
+        if d and (d.best or 0) > 0 then return ("Today %d shots"):format(d.best), "pld", Today() end
+        local w, l = 0, 0
+        for _, r in pairs(p.foes or {}) do w, l = w + (r.w or 0), l + (r.l or 0) end
+        if w + l > 0 then return ("Won %d  |  Lost %d"):format(w, l), "pld", Today() end
+        return "Chalk your cue", "pld", Today()
     end
     return ""
 end
@@ -935,6 +949,15 @@ function UI:Specials()
             say = ("The %sDaily Salvo|r at the Orb Cannon: one board for everyone. Clear it in as few shots as you can."):format(NAME),
             go = function() NS.Shell:SelectTab("orbs"); if O.Begin then O:Begin("daily") end end }
     end
+    -- Tavern Pool's Daily Table
+    local P = NS.PoolUI
+    local pld = P and P.db and P:Daily()
+    if pld then
+        out[#out + 1] = { kind = "daily", key = "pool", text = "Daily Table", title = "Daily Table", blurb = "Same pool table for everyone. Fewest shots wins.",
+            done = (pld.best or 0) > 0 and (pld.best .. " shots"),
+            say = ("The %sDaily Table|r at Tavern Pool: the same balls for everyone. Clear it in the fewest shots."):format(NAME),
+            go = function() NS.Shell:SelectTab("pool"); if P.Begin and P.game and P.game.phase ~= "aim" and P.game.phase ~= "roll" then P:Begin("daily") end end }
+    end
     -- the board has four lines: the flight comes first, then the dailies still open, then the
     -- ones already played
     if #out > 4 then
@@ -984,7 +1007,7 @@ end
 ---------------------------------------------------------------------------
 local BOARD_NAMES = { rb = "Rune Breaker", putt = "the Greens daily", flap = "Featherbeard", flapd = "the Ironforge Run",
     pin = "Pinball", gem = "Gem Rush", gemd = "the Daily Commission", gemw = "Work Orders",
-    ob = "Orb Cannon", obd = "the Daily Salvo" }
+    ob = "Orb Cannon", obd = "the Daily Salvo", pl = "the solo pool table", pld = "the Daily Table" }
 
 function UI:BuildTalk(f)
     local t = CreateFrame("Button", nil, f)
@@ -1049,7 +1072,7 @@ function UI:TalkLines()
                         local close = S:IsFriend(who) or S:IsGuildmate(who) or e.src == "guild" or e.src == "friend" or e.src == "group"
                         if close then
                             local beat = mine and ((S.GAMES[game] == "low" and e.s < mine.s) or (S.GAMES[game] ~= "low" and e.s > mine.s))
-                            local score = (S.GAMES[game] == "low") and NS.Putt.FormatTime(e.s) or W.Short(e.s)
+                            local score = (game == "pl" or game == "pld") and (e.s .. " shots") or ((S.GAMES[game] == "low") and NS.Putt.FormatTime(e.s) or W.Short(e.s))
                             local name = NAME .. (Ambiguate and Ambiguate(who, "short") or who) .. "|r"
                             local line = beat and ("%s beat you at %s: |cff000000%s|r"):format(name, label or game, score)
                                 or ("%s scored |cff000000%s|r at %s"):format(name, score, label or game)
@@ -1121,7 +1144,7 @@ function UI:OnShow()
     self:RefreshPortrait()
     if NS.Social then
         -- ask around for today's dailies so the talk and ranks are fresh
-        for _, g in ipairs({ "putt", "flapd", "gemd", "obd" }) do pcall(NS.Social.Query, NS.Social, g, Today()) end
+        for _, g in ipairs({ "putt", "flapd", "gemd", "obd", "pld" }) do pcall(NS.Social.Query, NS.Social, g, Today()) end
     end
     self.refreshT = 2
     self.mqT = 0

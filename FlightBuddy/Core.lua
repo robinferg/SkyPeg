@@ -23,6 +23,7 @@ local DEFAULTS = {
     pin = {},
     gem = {},
     orbs = {},
+    pool = {},
     boards = {},
 }
 
@@ -47,7 +48,7 @@ local function Setup()
     Merge(db, DEFAULTS)
     NS.db = db
     -- games read shared settings through their own sub-table (never saved twice)
-    for _, k in ipairs({ "peg", "putt", "flap", "pin", "gem", "orbs" }) do
+    for _, k in ipairs({ "peg", "putt", "flap", "pin", "gem", "orbs", "pool" }) do
         setmetatable(db[k], { __index = function(_, key) if key == "settings" then return db.settings end end })
     end
     NS.Social:Init(db)
@@ -59,6 +60,7 @@ local function Setup()
     NS.PinballUI:Init(db.pin)
     NS.GemsUI:Init(db.gem)
     NS.OrbsUI:Init(db.orbs)
+    NS.PoolUI:Init(db.pool)
     NS.Shell:Init(db)
 end
 
@@ -247,7 +249,7 @@ end)
 local function Help()
     NS.Print("commands:")
     print("  |cffffcc40/fb|r  open or close Flight Buddy")
-    print("  |cffffcc40/fb peg|r, |cffffcc40/fb putt|r, |cffffcc40/fb gem|r, |cffffcc40/fb orbs|r, |cffffcc40/fb roll|r, |cffffcc40/fb flap|r, |cffffcc40/fb pin|r  jump to a game")
+    print("  |cffffcc40/fb peg|r, |cffffcc40/fb putt|r, |cffffcc40/fb gem|r, |cffffcc40/fb orbs|r, |cffffcc40/fb pool|r, |cffffcc40/fb roll|r, |cffffcc40/fb flap|r, |cffffcc40/fb pin|r  jump to a game")
     print("  |cffffcc40/fb options|r  settings (auto-open on flights, sharing, sound, size...)")
     print("  |cffffcc40/fb test|r  preview the take-off prompt")
     print("  |cffffcc40/fb resetpos|r  move the window back to the middle")
@@ -260,6 +262,7 @@ local TAB_ALIASES = { peg = "peg", skypeg = "peg", peggle = "peg",
     roll = "roll", deathroll = "roll", dice = "roll",
     gem = "gem", gems = "gem", jewel = "gem", jewelcrafter = "gem", match = "gem",
     orbs = "orbs", orb = "orbs", cannon = "orbs", bubble = "orbs", bubbles = "orbs",
+    pool = "pool", billiards = "pool", eightball = "pool", ["8ball"] = "pool",
     home = "home", tavern = "home" }
 
 local function Slash(msg, forceTab)
