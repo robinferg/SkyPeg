@@ -2,7 +2,7 @@
 ## Title: Flight |cffff9e2eBuddy|r
 ## Notes: A tavern full of minigames for your flight paths: Rune Breaker, Gryphon Greens mini golf, Featherbeard, High Tinker Pinball, Jewelcrafter's Bench and Death Roll. /fb
 ## Author: Robin Ferguson
-## Version: 2.2.0
+## Version: 2.3.0
 ## SavedVariables: FlightBuddyDB
 ## IconTexture: Interface\Minimap\Tracking\FlightMaster
 ## AddonCompartmentFunc: FlightBuddy_OnAddonCompartmentClick

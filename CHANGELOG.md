@@ -1,5 +1,19 @@
 # Flight Buddy changelog
 
+## 2.3.0
+
+**Gryphon Greens: the whole green rolls.** The small round rises and hollows are gone. Every green is now one surface with its own shape, like a real putting green, and the break itself is the obstacle and the skill shot.
+
+- **Eleven kinds of green.** Greens that lean to one side, two-tier greens with the cup on the top shelf, hog's backs to hold the crest of, valleys that feed the cup, double-breakers and rolling greens that fall one way and then the other, banked corners you can ride round at pace, ridges right across the lane to carry, crowned cups, punchbowls, and downhill greens with a backstop behind the hole
+- **Reading the green.** Light and shadow show the shape of the green, and thin contour lines crowd together where it is steep. Pull back to putt and small beads drift downhill all over it: pale and slow on a gentle lean, amber on a steep one, red where a ball cannot stop. Let go and they fade away
+- **Punchbowls gather properly.** The slope now holds all the way down to the cup, so a ball that dies inside the bowl rolls in instead of stopping on its side
+- **Thoradin's Wall has three ways through.** The ramp launches from a normal firm putt (and tells you when you were too slow), and the door in the wall is a tunnel that lets the ball out on the far side
+- **Lifts carry the ball in plain sight.** In Thunder Bluff the platform rises with the ball on it; in the Undercity it sinks away on its own iron-and-stone elevator. No more rolling underground
+- **Circle of Binding:** the crack in the rock is half again as wide, so a ball that reaches it goes in
+- Every hole re-tested with a strong player and a casual one, and given a new par
+- Best times set on the old greens are retired again: course, route and today's daily bests start fresh, and times are only ranked against others set on this version. Stats, unlocks and the flight log are untouched
+- Versus needs both players on this version (the game tells you if they are not)
+
 ## 2.2.0
 
 **Gryphon Greens rebuilt.** The holes had become so easy that a strong player could bank a whole round down to 0 seconds. Every hole has been redesigned on its existing layout, following what the best mini golf games do: one idea per hole, a wide safe way round, a skilful line to the cup, and slopes that help a good putt as often as they punish a poor one.

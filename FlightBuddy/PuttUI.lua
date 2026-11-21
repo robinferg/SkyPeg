@@ -115,8 +115,9 @@ function UI:Init(db)
     db.holes, db.aces, db.dailies, db.underPar = db.holes or 0, db.aces or 0, db.dailies or 0, db.underPar or 0
     -- 2.2 made every hole much harder: best times set on the old holes are retired (your stats,
     -- unlocks and flight log stay), and a round saved part-way through the old holes is dropped
-    if db.rev ~= 2 then
-        db.rev = 2
+    -- 2.3 reshaped every green (whole-green break): the same again
+    if db.rev ~= 3 then
+        db.rev = 3
         db.quickBest, db.courseBest, db.round = nil, nil, nil
         local d = db.daily[NS.Social.Today()]
         if d and d.best then d.best, d.strokes, d.par = nil, nil, nil; db.dailies = math.max(0, db.dailies - 1) end
@@ -535,6 +536,7 @@ function UI:RenderHole()
         self.cup:Hide(); self.cupShadow:Hide(); self.pole:Hide(); self.poleShadow:Hide(); self.flag:Hide(); self.tee:Hide()
         self.ballTex:Hide(); self.ballGlow:Hide(); self.ballShadow:Hide()
         self.voidBg:SetColorTexture(0.08, 0.12, 0.10, 1)
+        self:RenderSurface(nil)
         self:RefreshHUD(true)
         return
     end
@@ -801,7 +803,160 @@ function UI:RenderHole()
     self.ballTex:SetVertexColor(ball.color[1], ball.color[2], ball.color[3])
     self.ballGlow:SetVertexColor(ball.color[1], ball.color[2], ball.color[3], ball.glow and 0.55 or 0.18)
     self.clubIcon:SetTexture(self:Club().icon)
+    self:RenderSurface(h)
     self:RefreshHUD(true)
+end
+
+---------------------------------------------------------------------------
+-- The shape of the green (PuttHard.lua "surface"), drawn once per hole: ground that faces the
+-- light from the top left is brightened and ground that faces away is shaded, like a relief map,
+-- and high ground is a touch paler than low. The beads that run downhill are laid out here too
+-- and moved every frame in DrawHazards.
+---------------------------------------------------------------------------
+function UI:RenderSurface(h)
+    self.surfPool = self.surfPool or {}
+    self.linePool = self.linePool or {}
+    local pool, used = self.surfPool, 0
+    local lines, nl = self.linePool, 0
+    self.beads = nil
+    local cv = self.canvas
+    local g = h and h.surf
+    if g then
+        local TERR = Putt.TERRAIN
+        local PW, PH = Putt.C.W, Putt.C.H
+        local function ground(x, y)
+            local t = TERR[Putt.Cell(h, x, y) or " "]
+            return t and not t.hazard and not t.pit
+        end
+        local function inside(x, y, m)
+            return ground(x, y) and ground(x - m, y) and ground(x + m, y) and ground(x, y - m) and ground(x, y + m)
+        end
+        local Height, Lie = Putt.Height, Putt.Lie
+        -- relief: one soft patch per sample, light or dark
+        local span = max(1, g.hi - g.lo)
+        local mid = (g.hi + g.lo) / 2
+        local tallK = min(1, span / 5000)
+        local STEP = 12
+        for y = STEP / 2, PH, STEP do
+            for x = STEP / 2, PW, STEP do
+                if inside(x, y, 8) then
+                    local ax, ay = Lie(h, x, y)
+                    -- downhill towards the top left = facing the light
+                    local lit = -(ax + ay) * 0.7071 / 140
+                    local al = abs(lit)
+                    if al > 1 then al = 1 end
+                    al = al ^ 0.7
+                    local v = (lit < 0 and -al or al) * 0.9 + (Height(h, x, y) - mid) / span * tallK * 0.6
+                    if v > 0.05 or v < -0.05 then
+                        used = used + 1
+                        local t = pool[used]
+                        if not t then t = W.Tex(cv, "ARTWORK", "glow", -5); pool[used] = t end
+                        t:ClearAllPoints()
+                        t:SetSize(STEP * 3.4, STEP * 3.4); t:SetPoint("CENTER", cv, "TOPLEFT", x, -y)
+                        if v > 0 then
+                            t:SetBlendMode("ADD"); t:SetVertexColor(0.8, 1, 0.5, 0.2 * min(1, v))
+                        else
+                            t:SetBlendMode("BLEND"); t:SetVertexColor(0, 0.07, 0.02, 0.55 * min(1, -v))
+                        end
+                        t:Show()
+                    end
+                end
+            end
+        end
+        -- contour lines, as on a map: every line is the same step in height, so lines crowd
+        -- together where the green is steep and spread out where it is gentle
+        local EVERY, M = 1500, 12
+        local SH, list = Putt.SurfaceHeight, h.surface
+        local function line(x1, y1, x2, y2)
+            local dx, dy = x2 - x1, y2 - y1
+            local len = sqrt(dx * dx + dy * dy)
+            if len < 0.5 then return end
+            nl = nl + 1
+            local t = lines[nl]
+            if not t then t = W.Tex(cv, "ARTWORK", "pill", -4); lines[nl] = t end
+            t:ClearAllPoints()
+            t:SetSize(len + 1.4, 1.3)
+            t:SetPoint("CENTER", cv, "TOPLEFT", (x1 + x2) / 2, -(y1 + y2) / 2)
+            if t.SetRotation then t:SetRotation(atan2(-dy, dx)) end
+            t:SetVertexColor(0.02, 0.22, 0.05, 0.27)
+            t:Show()
+        end
+        for y = 0, PH - M, M do
+            for x = 0, PW - M, M do
+                if ground(x + M / 2, y + M / 2) and inside(x + M / 2, y + M / 2, 5) then
+                    local a, b = SH(list, x, y), SH(list, x + M, y)
+                    local c, d = SH(list, x + M, y + M), SH(list, x, y + M)
+                    local lo, hi = min(a, b, c, d), max(a, b, c, d)
+                    if hi - lo > 1 then
+                        for lv = math.ceil(lo / EVERY), floor(hi / EVERY) do
+                            local L = lv * EVERY + 0.37   -- a hair off round heights, so a level green on a line draws nothing
+                            local px, py, n = {}, {}, 0
+                            if (a < L) ~= (b < L) then n = n + 1; px[n], py[n] = x + M * (L - a) / (b - a), y end
+                            if (b < L) ~= (c < L) then n = n + 1; px[n], py[n] = x + M, y + M * (L - b) / (c - b) end
+                            if (d < L) ~= (c < L) then n = n + 1; px[n], py[n] = x + M * (L - d) / (c - d), y + M end
+                            if (a < L) ~= (d < L) then n = n + 1; px[n], py[n] = x, y + M * (L - a) / (d - a) end
+                            if n >= 2 then line(px[1], py[1], px[2], py[2]) end
+                            if n == 4 then line(px[3], py[3], px[4], py[4]) end
+                        end
+                    end
+                end
+            end
+        end
+        -- beads: a staggered lattice over the green, wherever it leans enough to move a putt.
+        -- Each is a small round bead with a dark twin just behind it (so it reads on the palest
+        -- felt), sized and coloured here once; DrawHazards only slides and fades them. With reduced
+        -- motion they stand still, so they are little chevrons that point downhill instead.
+        local beads, row = {}, 0
+        local GAP = 24
+        local decel = Putt.C.DECEL
+        local still = NS.db.settings.reducedMotion
+        self.beadPool = self.beadPool or {}
+        local bp = self.beadPool
+        for y = GAP / 2, PH, GAP * 0.87 do
+            row = row + 1
+            for x = (row % 2 == 0) and GAP or GAP / 2, PW, GAP do
+                if inside(x, y, 7) then
+                    local ax, ay = Lie(h, x, y)
+                    local m = sqrt(ax * ax + ay * ay)
+                    if m >= 9 then
+                        local dx, dy = ax / m, ay / m
+                        local hot = min(1.3, m / decel)
+                        local n = #beads + 1
+                        local t = bp[n]
+                        if not t then
+                            t = { sh = W.Tex(cv, "ARTWORK", "circle", -3), ch = W.Tex(cv, "ARTWORK", "circle", -2) }
+                            bp[n] = t
+                        end
+                        if still then
+                            local sz, rot = 15 + 4 * min(1, hot), -atan2(dx, -dy)
+                            t.sh:SetTexture(W.MEDIA .. "t_chevron"); t.ch:SetTexture(W.MEDIA .. "t_chevron")
+                            t.sh:SetSize(sz, sz); t.ch:SetSize(sz, sz)
+                            if t.ch.SetRotation then t.sh:SetRotation(rot); t.ch:SetRotation(rot) end
+                        else
+                            local sz = 4.2 + 1.6 * min(1, hot)
+                            t.sh:SetTexture(W.MEDIA .. "circle"); t.ch:SetTexture(W.MEDIA .. "circle")
+                            t.sh:SetSize(sz + 1.8, sz + 1.8); t.ch:SetSize(sz, sz)
+                            if t.ch.SetRotation then t.sh:SetRotation(0); t.ch:SetRotation(0) end
+                        end
+                        t.sh:SetVertexColor(0, 0.14, 0.03)
+                        if hot >= 1 then t.ch:SetVertexColor(1, 0.45, 0.22)
+                        else t.ch:SetVertexColor(1, 1 - 0.3 * hot, 0.88 - 0.6 * hot) end
+                        t.sh:ClearAllPoints(); t.ch:ClearAllPoints()
+                        t.sh:SetPoint("CENTER", cv, "TOPLEFT", x + 0.6, -(y + 0.6)); t.ch:SetPoint("CENTER", cv, "TOPLEFT", x, -y)
+                        t.sh:SetAlpha(0); t.ch:SetAlpha(0)
+                        t.sh:Show(); t.ch:Show()
+                        beads[n] = { x = x, y = y, dx = dx, dy = dy, len = 18, sh = t.sh, ch = t.ch,
+                            spd = 0.3 + 0.6 * hot, al = 0.8 + 0.2 * min(1, hot), ph = ((x * 0.137 + y * 0.291) % 1) }
+                    end
+                end
+            end
+        end
+        self.beads = beads
+        self.beadsHidden, self.beadAcc, self.readFade = nil, 1, 0
+    end
+    for i = #(self.beads or {}) + 1, #(self.beadPool or {}) do self.beadPool[i].sh:Hide(); self.beadPool[i].ch:Hide() end
+    for i = used + 1, #pool do pool[i]:Hide() end
+    for i = nl + 1, #lines do lines[i]:Hide() end
 end
 
 ---------------------------------------------------------------------------
@@ -911,44 +1066,56 @@ function UI:DrawHazards(el)
             t:SetSize(18 * sq, 18); t:SetPoint("CENTER", cv, "TOPLEFT", c.x, -(c.y + bob))
         end
     end
-    -- the lie of the green (PuttHard.lua "contours"): a rise is lit from the top left like a low
-    -- dome, a hollow the other way round; thin rings mark the height and chevrons run downhill
-    for ci, c in ipairs(h.contours or {}) do
-        local rise = c.a > 0
-        local d = c.r * 2
-        local sh = self:Hz("lshade", "shade", "ARTWORK", -4)
-        sh:SetSize(d, d); sh:SetPoint("CENTER", cv, "TOPLEFT", c.x, -c.y)
-        if not rise and sh.SetRotation then sh:SetRotation(pi) end
-        local steep = min(1, abs(c.a) / 190)
-        sh:SetAlpha(0.34 + 0.24 * steep)
-        if not rise then
-            local pit = self:Hz("lpit", "glow", "ARTWORK", -4)
-            pit:SetSize(d * 0.8, d * 0.8); pit:SetPoint("CENTER", cv, "TOPLEFT", c.x, -c.y)
-            pit:SetVertexColor(0, 0.05, 0, 0.30 + 0.2 * steep)
+    -- reading the green: while you are pulling back to putt (and for a moment when a hole opens)
+    -- small beads drift downhill all over it, slow and pale where it barely leans, quick and amber
+    -- where it is steep, red where it is too steep for a ball to stop. The rest of the time the
+    -- green is left alone. Their textures are made once per hole (RenderSurface); here they are
+    -- only moved, 30 times a second.
+    local beads = self.beads
+    if beads then
+        local want = ((self.drag and g.state == "aim") and 1) or ((self.readUntil and rt < self.readUntil) and 0.85) or 0
+        local fade = self.readFade or 0
+        if fade < want then fade = min(want, fade + (el or 0.034) * 5) elseif fade > want then fade = max(want, fade - (el or 0.034) * 2.2) end
+        self.readFade = fade
+        if fade <= 0 then
+            if not self.beadsHidden then
+                for k = 1, #beads do beads[k].sh:SetAlpha(0); beads[k].ch:SetAlpha(0) end
+                self.beadsHidden = true
+            end
         else
-            local top = self:Hz("ltop", "glow", "ARTWORK", -4, "ADD")
-            top:SetSize(d * 0.75, d * 0.75); top:SetPoint("CENTER", cv, "TOPLEFT", c.x - c.r * 0.12, -(c.y - c.r * 0.12))
-            top:SetVertexColor(0.9, 1, 0.6, 0.07 + 0.05 * steep)
+            self.beadsHidden = nil
+            self.beadAcc = (self.beadAcc or 1) + (el or 0.034)
+            if self.beadAcc >= 0.033 then
+                self.beadAcc = 0
+                for k = 1, #beads do
+                    local bd = beads[k]
+                    local ph = calm and 0.5 or ((rt * bd.spd + bd.ph) % 1)
+                    local off = (ph - 0.5) * bd.len
+                    local bx, by = bd.x + bd.dx * off, bd.y + bd.dy * off
+                    local al = (calm and 0.85 or sin(ph * pi)) * bd.al * fade
+                    bd.sh:SetPoint("CENTER", cv, "TOPLEFT", bx + 0.6, -(by + 0.6))
+                    bd.sh:SetAlpha(al * 0.5)
+                    bd.ch:SetPoint("CENTER", cv, "TOPLEFT", bx, -by)
+                    bd.ch:SetAlpha(al)
+                end
+            end
         end
-        for k, f in ipairs({ 1, 0.66, (c.flat > 0.1) and c.flat or 0.34 }) do
-            local ring = self:Hz("lring", "shock", "ARTWORK", -3)
-            ring:SetSize(d * f, d * f); ring:SetPoint("CENTER", cv, "TOPLEFT", c.x, -c.y)
-            if rise then ring:SetVertexColor(0.04, 0.16, 0.04, 0.30 - k * 0.04) else ring:SetVertexColor(0.02, 0.10, 0.02, 0.26 + k * 0.05) end
-        end
-        -- which way a ball will roll: chevrons drifting down the flank
-        local n = c.r >= 40 and 8 or 6
-        for k = 1, n do
-            local an = (k - 1) * 2 * pi / n + ci * 0.7
-            local hot = max(0, min(1, (abs(c.a) - 70) / 110))
-            local ph = calm and 0.5 or ((rt * (0.16 + 0.26 * hot) + k * 0.37) % 1)
-            local u = c.flat + (1 - c.flat) * (rise and (0.18 + 0.7 * ph) or (0.88 - 0.7 * ph))
-            local x, y = c.x + cos(an) * c.r * u, c.y + sin(an) * c.r * u
-            local ch = self:Hz("lchev", "t_chevron", "ARTWORK", -2)
-            ch:SetSize(13, 13); ch:SetPoint("CENTER", cv, "TOPLEFT", x, -y)
-            local dx, dy = cos(an) * (rise and 1 or -1), sin(an) * (rise and 1 or -1)
-            if ch.SetRotation then ch:SetRotation(-atan2(dx, -dy)) end
-            -- like the beads on a putting grid: pale and slow on a gentle slope, amber and quick on a steep one
-            ch:SetVertexColor(1, 1 - 0.3 * hot, 0.85 - 0.65 * hot, (calm and 0.6 or sin(ph * pi)) * (0.5 + 0.3 * steep))
+    end
+    -- a tunnel mouth the painting does not show (the far side of a doorway): a dark arch in the wall
+    for _, pt in ipairs(h.portals or {}) do
+        if pt.markB then
+            local cb = h.curb or CURB
+            -- tucked back against the wall it comes out of, rimmed in the wall's own stone
+            local mx, my = pt.bx - (pt.dx or 0) * 6, pt.by - (pt.dy or 0) * 6
+            local rim = self:Hz("tmrim", "circle", "ARTWORK", -3)
+            rim:SetSize(pt.r * 2 + 6, pt.r * 2 + 6); rim:SetPoint("CENTER", cv, "TOPLEFT", mx, -my)
+            rim:SetVertexColor(cb[1] * 0.95, cb[2] * 0.93, cb[3] * 0.9)
+            local edge = self:Hz("tmedge", "circle", "ARTWORK", -2)
+            edge:SetSize(pt.r * 2 + 1, pt.r * 2 + 1); edge:SetPoint("CENTER", cv, "TOPLEFT", mx, -my)
+            edge:SetVertexColor(cb[1] * 0.45, cb[2] * 0.42, cb[3] * 0.4)
+            local hole = self:Hz("tmhole", "circle", "ARTWORK", -1)
+            hole:SetSize(pt.r * 2 - 3, pt.r * 2 - 3); hole:SetPoint("CENTER", cv, "TOPLEFT", mx, -my)
+            hole:SetVertexColor(0.16, 0.11, 0.08)
         end
     end
     -- added walls (PuttHard.lua): a course of stone blocks in the colour of the hole's own curb
@@ -1289,6 +1456,8 @@ UI.Events = {}
 local E = UI.Events
 
 function E:hole(index, h)
+    self.readUntil = (self.rt or 0) + 3.6   -- show the lie of the new green for a moment
+    self.ride = nil
     self.tunnelFx = nil
     self:RenderHole()
     local c = self.game.course
@@ -1377,6 +1546,10 @@ function E:land(air)
     W.SFX("pop1")
 end
 
+function E:rampShort()
+    self:Banner("Not enough pace", "Hit the ramp harder to fly over.", COLORS.dim, 1.2)
+end
+
 function E:boost()
     local b = self.game.ball
     self:Burst(b.x, b.y, TERRAIN_COLOR.boost, 10, 90)
@@ -1384,6 +1557,11 @@ function E:boost()
 end
 
 function E:portal(pt, dur, tu)
+    if pt.lift then
+        -- a lift: the ball rides the platform in plain sight (see the ball drawing in OnUpdate)
+        W.SFX("launch")
+        return
+    end
     if pt.baked then
         -- into the tunnel: a puff of dust, then its shadow rolls along underground
         local fx, fy, tx, ty = pt.ax, pt.ay, pt.bx, pt.by
@@ -1399,6 +1577,7 @@ function E:portal(pt, dur, tu)
 end
 
 function E:tunnelOut(pt, tu)
+    if pt.lift then W.SFX("knock", 0.05); return end
     local x, y = pt.bx, pt.by
     if tu then x, y = tu.tx, tu.ty end
     self:Burst(x, y, { 0.6, 0.5, 0.38 }, 12, 90)
@@ -1655,7 +1834,11 @@ function UI:ShowFigures(h)
         f.shadow:SetSize(fig.h * 0.62, fig.h * 0.16)
         f.shadow:SetPoint("CENTER", self.canvas, "TOPLEFT", fig.x, -(fig.y - fig.h * 0.02))
         f.jump, f.near = 0, false
-        f.tex:SetVertexColor(1, 1, 1)
+        -- the same prop in another land's colours (the Undercity's elevator is the lift in cold iron)
+        if f.tex.SetDesaturated then f.tex:SetDesaturated(fig.gray and true or false) end
+        local tint = fig.tint
+        f.tex:SetVertexColor(tint and tint[1] or 1, tint and tint[2] or 1, tint and tint[3] or 1)
+        f.tex:SetAlpha(1)
         f.tex:Show(); f.shadow:Show()
     end
     self.figN = #(h.figures or {})
@@ -1774,8 +1957,17 @@ function UI:UpdateFigures(el)
                 if k < 0.12 then rot = (fig.flip and 1 or -1) * sin(k / 0.12 * pi) * 0.35 end
             end
         end
-        f.tex:SetSize(h * sx, h * sy)
-        f.tex:SetPoint("BOTTOM", cv, "TOPLEFT", x + dx, -(y - dy))
+        -- a lift platform carrying the ball rises or sinks with it (the ride is worked out with the ball)
+        local rs, ra = 1, 1
+        local rd = self.ride
+        if rd and (fig.name == "lift" or fig.lift) then
+            local cy = y - h / 2
+            if (x - rd.x) ^ 2 + (cy - rd.y) ^ 2 < 400 then rs, ra = rd.s, rd.a
+            elseif (x - rd.fx) ^ 2 + (cy - rd.fy) ^ 2 < 400 then ra = max(0, (rd.k - 0.5) / 0.5) end
+        end
+        f.tex:SetAlpha(ra)
+        f.tex:SetSize(h * sx * rs, h * sy * rs)
+        f.tex:SetPoint("BOTTOM", cv, "TOPLEFT", x + dx, -(y + h * (rs - 1) / 2 - dy))
         if f.tex.SetRotation then f.tex:SetRotation(rot) end
         if fig.anim == "fight" then f.tex:SetVertexColor(1, 1 - 0.55 * hurt, 1 - 0.55 * hurt) end
         f.shadow:SetAlpha(1 - min(0.5, dy / h * 2))
@@ -1852,7 +2044,9 @@ function UI:OnUpdate(el)
         local b = g.ball
         local show = g.state ~= "sunk" and g.state ~= "done"
         -- underground (tunnel) or under a roof (the windmill): only a shadow shows
-        local hidden = b.tunnel ~= nil
+        -- on a lift it stays in sight and rides the platform
+        local ride = b.tunnel and b.tunnel.pt.lift
+        local hidden = b.tunnel ~= nil and not ride
         local covered = false
         if not hidden and h.covers then
             for _, c in ipairs(h.covers) do
@@ -1863,13 +2057,37 @@ function UI:OnUpdate(el)
         self.ballGlow:SetShown(show and not hidden and not covered)
         self.ballShadow:SetShown(show)
         self:UpdateTunnel(el, b)
-        if show and hidden then
+        if show and ride then
+            -- the platform carries the ball out of sight at one end (rising towards you, or sinking
+            -- away) and brings it into sight at the other; the platforms themselves follow in UpdateFigures
+            local tu = b.tunnel
+            local k = min(1, tu.t / tu.dur)
+            local up = (ride == "up") == (tu.toB and true or false)
+            local far, near = up and 1.5 or 0.55, up and 0.55 or 1.5
+            local s, al, x, y
+            if k < 0.5 then
+                local q = k / 0.5
+                s, al, x, y = 1 + (far - 1) * q, 1 - max(0, (q - 0.45) / 0.55), tu.fx, tu.fy
+            else
+                local q = (k - 0.5) / 0.5
+                s, al, x, y = near + (1 - near) * q, min(1, q / 0.55), tu.tx, tu.ty
+            end
+            self.ride = { x = x, y = y, s = s, a = al, fx = tu.fx, fy = tu.fy, k = k }
+            local bs = (P.BALL_R * 2 + 2) * s
+            self.ballTex:SetSize(bs, bs)
+            self.ballTex:SetPoint("CENTER", cv, "TOPLEFT", x, -y)
+            self.ballGlow:SetPoint("CENTER", cv, "TOPLEFT", x, -y)
+            self.ballTex:SetAlpha(al); self.ballGlow:SetAlpha(al)
+            self.ballShadow:SetPoint("CENTER", cv, "TOPLEFT", x + 2, -y - 2)
+            self.ballShadow:SetAlpha(al * 0.6)
+        elseif show and hidden then
             local tu = b.tunnel
             local k = min(1, tu.t / tu.dur)
             local sx, sy = tu.fx + (tu.tx - tu.fx) * k, tu.fy + (tu.ty - tu.fy) * k
             self.ballShadow:SetPoint("CENTER", cv, "TOPLEFT", sx, -sy)
             self.ballShadow:SetAlpha(0.55 + 0.25 * sin(self.rt * 30))
         elseif show then
+            if self.ride then self.ride = nil; self.ballTex:SetAlpha(1); self.ballGlow:SetAlpha(1) end
             -- off a ramp the ball rises toward you: bigger, lifted, its shadow left on the ground
             local z = b.z or 0
             local bs = (P.BALL_R * 2 + 2) * (1 + 0.75 * z)
@@ -2221,7 +2439,7 @@ function UI:ShowHelp()
             "",
             "It's a |cffffcc40time trial|r, first putt to last cup. Every stroke under par takes 5s off, every stroke over adds 5s, and a hole-in-one takes off 5s more. Bonuses can take off at most half your time.",
             "",
-            "|cffffcc40Read the green|r: a shaded dome is a rise, a dish is a hollow, and the chevrons run downhill: pale and slow on a gentle slope, amber and quick on a steep one. Putts break more as they slow, and a ball that dies on a steep flank rolls back.",
+            "|cffffcc40Read the green|r: the whole green rolls. Light and shadow show its shape, and contour lines crowd together where it is steep. Pull back to putt and beads drift downhill: pale and slow on a gentle lean, amber on a steep one, red where a ball cannot stop.",
             "",
             "Water, lava and slime cost a stroke. A ball that stops against a rail is moved a club-head off it.",
             "",

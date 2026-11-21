@@ -1532,7 +1532,7 @@ NS.PuttCourses.mulgore = { key = "mulgore", name = "Mulgore", holes = {
         tee = { 239, 515 },
         cup = { 239, 100 },
         bumpers = {  },
-        portals = { { ax = 238, ay = 394, bx = 238, by = 204, r = 13, dx = 0, dy = -1, adx = 0, ady = 1, exit = 110 } },
+        portals = { { ax = 238, ay = 394, bx = 238, by = 204, r = 13, dx = 0, dy = -1, adx = 0, ady = 1, exit = 110, lift = "up" } },
         extra = { coins = { { 330, 150 } } },
         ramps = {  },
         cannons = {  },

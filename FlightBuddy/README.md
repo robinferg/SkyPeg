@@ -46,18 +46,19 @@ It's a **time trial**: the clock runs from your first putt to your last cup. Eac
 each stroke over par adds 5 seconds, and a hole-in-one takes off an extra 5 seconds. Bonuses can take off at most
 half your time. Water, lava and slime cost a stroke.
 
-Every hole is built round one idea standing where the easy putt would go: a wall across half the lane to bank round,
-a gate to thread, a post to pick a side of, a rise to go over or round, a pass between two rises that gathers a
-well-aimed putt, a broad swell that bends the line. Openings are never less than half the lane, and every hole can be
-aced with the right shot.
+**The whole green rolls**, like a real putting green. Every hole has its own shape: a green that leans to one side,
+a two-tier green with the cup on the top shelf, a hog's back to hold the crest of, a valley that feeds the cup, a ridge
+right across the lane, a double-breaker that falls one way and then the other, a banked corner you can ride round at pace, a crowned cup, a
+punchbowl. The break is the obstacle, and the skill shot: read it right and the green does the work for you.
 
-The greens have **contours**, like a real putting green. A shaded dome is a rise and a dish is a hollow; chevrons drift
-downhill to show which way a ball will roll. A putt across a slope **breaks** downhill, and breaks more the slower it is
-rolling. Putt up a steep rise too softly and the ball runs out of pace and rolls back; hit it firmly and it goes over
-the top. Some cups sit on a **crown** (a level top with a slope all round: too soft comes back to you, too hard runs off
-the far side), some at the bottom of a **punchbowl** that gathers anything that reaches it, and some have a
-**backstop**: a rise behind the cup that brings a bold putt back. The chevrons are pale and slow on a gentle slope,
-amber and quick on a steep one.
+**Reading it**: light and shadow show the shape of the green, thin contour lines crowd together where it is steep, and
+high ground is paler than low. Pull back to putt (or watch for a moment as a hole opens) and small beads drift downhill
+all over it: pale and slow on a gentle lean, amber and quick on a steep one, red where it is too steep for a ball to stop
+(it will roll on down). A putt across a slope **breaks** downhill, and breaks more the slower it is rolling; uphill costs
+pace and downhill gives it. A punchbowl carries anything that dies inside it to the cup.
+
+A few holes also keep one wall or post standing where the easy putt would go. Openings are never less than half the
+lane, and every hole can be aced with the right shot.
 
 - **Daily course**: the same course for everyone that day. Replay as often as you like; your best time counts.
 - **Quick round**: any course, any time. Your best time on each course goes on that course's leaderboard.

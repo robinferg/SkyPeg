@@ -207,6 +207,8 @@ local function BuildPainted(tpl, seed, mirror, rng)
         if p.dx then pt.dx = (mirror and -1 or 1) * p.dx; pt.dy = p.dy end
         if p.adx then pt.adx = (mirror and -1 or 1) * p.adx; pt.ady = p.ady end
         pt.exit = p.exit
+        pt.markB = p.markB   -- the far mouth is not in the painting: the game draws it
+        pt.lift = p.lift     -- "up" or "down": a lift platform the ball rides in plain sight, not a tunnel
         h.portals[#h.portals + 1] = pt
     end
     -- launch ramps: hit one fast enough, along its direction, and the ball flies over whatever is behind it
@@ -286,13 +288,30 @@ local function BuildPainted(tpl, seed, mirror, rng)
             h.fences[#h.fences + 1] = { x1, y1, x2, y2 }
         end
     end
-    -- ex.contours: the lie of the green. A rise ({ x, y, r, a > 0 }) pushes the ball away from its
-    -- crest, a hollow (a < 0) draws it in; a is the pull at the steepest part of the flank, and when
-    -- that beats rolling resistance a ball cannot stop there: it rolls back down. flat is the share
-    -- of the radius that is level on top (a crowned cup sits on it).
-    h.contours = {}
-    for _, c in ipairs(ex and ex.contours or {}) do
-        h.contours[#h.contours + 1] = { x = X(c.x), y = c.y, r = c.r, a = c.a, flat = c.flat or 0, cup = c.cup }
+    -- ex.surface: the shape of the whole green (see Putt.SurfaceGrid). Each entry adds to its height:
+    --   tilt   { k = "tilt", dx, dy, a }                the whole green falls away towards (dx, dy)
+    --   grade  { k = "grade", x1, y1, x2, y2, h }       climbs by h from the first point to the second, level beyond both
+    --   ridge  { k = "ridge", h, w, pts = { x, y, ... } } a rounded ridge (h > 0) or a trough (h < 0) along a line, w to each side
+    --   mound  { k = "mound", x, y, r, h, flat }        a round rise (h > 0) or hollow (h < 0); flat is the level share of its radius
+    --   funnel { k = "funnel", x, y, r, a }             a punchbowl whose slope holds all the way down to its middle
+    -- Heights are in the units gravity works in: the pull on the ball is the downhill slope of the
+    -- surface, and where that beats rolling resistance a ball cannot stop: it rolls on down.
+    h.surface = nil
+    if ex and ex.surface and ex.surface[1] then
+        local list = {}
+        for _, c in ipairs(ex.surface) do
+            local q = { k = c.k, a = c.a, h = c.h, w = c.w, r = c.r, flat = c.flat, y = c.y, y1 = c.y1, y2 = c.y2, dy = c.dy }
+            if c.x then q.x = X(c.x) end
+            if c.x1 then q.x1, q.x2 = X(c.x1), X(c.x2) end
+            if c.dx then q.dx = (mirror and -1 or 1) * c.dx end
+            if c.pts then
+                q.pts = {}
+                for i = 1, #c.pts, 2 do q.pts[i], q.pts[i + 1] = X(c.pts[i]), c.pts[i + 1] end
+            end
+            list[#list + 1] = q
+        end
+        h.surface = list
+        h.surf = Putt.SurfaceGrid(list, ex.surface, mirror)
     end
     -- signature hazards (mages, ghouls, war drums, whirlwinds, tide pools): see Putt:StepActors
     h.actors = {}
@@ -720,6 +739,7 @@ function Putt:Shoot(angle, power)
     b.usedBless = used
     b.vx, b.vy = cos(angle) * sp, sin(angle) * sp
     b.age, b.slow, b.portalLock, b.travel, b.tunnel, b.knocked = 0, 0, nil, 0, nil, nil
+    b.rampShort = nil
     b.air, b.z, b.twist, b.whirled, b.lift = nil, nil, nil, nil, nil
     b.twistCd = nil   -- every putt starts clean, so a replay of the shot on another client matches
     self.fanPin = nil
@@ -1449,6 +1469,11 @@ function Putt:Step(h)
         local rx, ry = b.x - rp.x, b.y - rp.y
         if rx * rx + ry * ry < rp.r * rp.r then
             local along = b.vx * rp.dx + b.vy * rp.dy
+            if along < rp.min and along > 40 and not b.rampShort then
+                -- rolled onto it without the pace to fly: say so once per putt
+                b.rampShort = true
+                self:Emit("rampShort", rp)
+            end
             if along >= rp.min then
                 -- the ramp throws the ball the way it points (a glancing hit keeps a little of its sideways drift)
                 local side = b.vx * -rp.dy + b.vy * rp.dx
@@ -1484,9 +1509,9 @@ function Putt:Step(h)
     -- slopes and boost pads
     local ax, ay = 0, 0
     if t.slope then ax, ay = t.slope[1] * P.SLOPE, t.slope[2] * P.SLOPE end
-    -- rises and hollows: gravity down the flank
+    -- the shape of the green: gravity down whatever slope the ball is on
     local lie = 0
-    if hole.contours and hole.contours[1] then
+    if hole.surf then
         local cx, cy = Putt.Lie(hole, b.x, b.y)
         ax, ay = ax + cx, ay + cy
         lie = sqrt(cx * cx + cy * cy)
@@ -1619,7 +1644,7 @@ function Putt:Step(h)
             local len = sqrt((pt.bx - pt.ax) ^ 2 + (pt.by - pt.ay) ^ 2)
             local fx, fy, tx, ty = pt.ax, pt.ay, pt.bx, pt.by
             if not enterA then fx, fy, tx, ty = pt.bx, pt.by, pt.ax, pt.ay end
-            b.tunnel = { pt = pt, t = 0, dur = max(0.4, min(1.1, len / max(tsp, 180))), sp = tsp,
+            b.tunnel = { pt = pt, t = 0, dur = pt.lift and 1.3 or max(0.4, min(1.1, len / max(tsp, 180))), sp = tsp,
                          vx = b.vx, vy = b.vy, toB = enterA, fx = fx, fy = fy, tx = tx, ty = ty }
             b.x, b.y = fx, fy
             b.vx, b.vy = 0, 0
@@ -1646,6 +1671,7 @@ function Putt:Step(h)
     local resting = (sp < P.STOP and not t.boost and not b.windy and lie < (t.decel or P.DECEL)
             and (not t.slope or (t.decel or P.DECEL) > P.SLOPE * max(abs(t.slope[1]), abs(t.slope[2]))))
         or (b.still > 0.7 and lie < (t.decel or P.DECEL))
+        or b.still > 1.0   -- held still for a second (pinned against a rail by a slope, say): it has stopped
     b.windy = false
     if resting or b.age > P.SHOT_TIMEOUT then
         b.vx, b.vy = 0, 0
@@ -1653,25 +1679,118 @@ function Putt:Step(h)
     end
 end
 
--- The pull of the green's contours on a ball at (x, y): acceleration down the flank of every rise
--- and hollow it is on. Zero on the level top of a rise and at the bottom of a hollow.
-function Putt.Lie(hole, x, y)
-    local ax, ay = 0, 0
-    local list = hole.contours or {}
+-- The height of a green's surface at (x, y): the sum of its shapes (see BuildPainted, ex.surface).
+function Putt.SurfaceHeight(list, x, y)
+    local H = 0
     for i = 1, #list do
-        local c = list[i]
-        local dx, dy = x - c.x, y - c.y
-        local d2 = dx * dx + dy * dy
-        if d2 < c.r * c.r and d2 > 1e-6 then
-            local d = sqrt(d2)
-            local u = d / c.r
-            if u > c.flat then
-                local k = c.a * sin(pi * (u - c.flat) / (1 - c.flat)) / d
-                ax, ay = ax + dx * k, ay + dy * k
+        local s = list[i]
+        local k = s.k
+        if k == "tilt" then
+            H = H - s.a * (s.dx * (x - P.W / 2) + s.dy * (y - P.H / 2))
+        elseif k == "grade" then
+            local ex, ey = s.x2 - s.x1, s.y2 - s.y1
+            local u = ((x - s.x1) * ex + (y - s.y1) * ey) / (ex * ex + ey * ey)
+            if u >= 1 then H = H + s.h elseif u > 0 then H = H + s.h * u * u * (3 - 2 * u) end
+        elseif k == "ridge" then
+            local p, best = s.pts, 1e18
+            for q = 1, #p - 3, 2 do
+                local x1, y1 = p[q], p[q + 1]
+                local ex, ey = p[q + 2] - x1, p[q + 3] - y1
+                local l2 = ex * ex + ey * ey
+                local t = l2 > 0 and ((x - x1) * ex + (y - y1) * ey) / l2 or 0
+                if t < 0 then t = 0 elseif t > 1 then t = 1 end
+                local dx, dy = x - (x1 + ex * t), y - (y1 + ey * t)
+                local d2 = dx * dx + dy * dy
+                if d2 < best then best = d2 end
+            end
+            local w2 = s.w * s.w
+            if best < w2 then local v = 1 - best / w2; H = H + s.h * v * v end
+        elseif k == "mound" then
+            local dx, dy = x - s.x, y - s.y
+            local d2 = dx * dx + dy * dy
+            if d2 < s.r * s.r then
+                local u, f = sqrt(d2) / s.r, s.flat or 0
+                if u <= f then H = H + s.h
+                else local v = (u - f) / (1 - f); local w = 1 - v * v; H = H + s.h * w * w end
+            end
+        elseif k == "funnel" then
+            local dx, dy = x - s.x, y - s.y
+            local d2 = dx * dx + dy * dy
+            if d2 < s.r * s.r then
+                local u = sqrt(d2) / s.r
+                if u >= 0.6 then H = H - s.a * s.r * (1 - u) * (1 - u) / 0.8
+                else H = H - s.a * s.r * (0.8 - u) end
             end
         end
     end
-    return ax, ay
+    return H
+end
+
+-- The surface worked out once on a grid: its height at every node, and the pull of gravity there
+-- (the downhill slope). Play reads the pull between nodes; the screen reads both to draw the green.
+local SURF_RES = 8
+local surfCache = setmetatable({}, { __mode = "k" })
+function Putt.SurfaceGrid(list, key, mirror)
+    local c = key and surfCache[key]
+    if c and c[mirror and 2 or 1] then return c[mirror and 2 or 1] end
+    local res = SURF_RES
+    local nx, ny = floor(P.W / res) + 1, floor(P.H / res) + 1
+    local g = { res = res, nx = nx, ny = ny, gx = {}, gy = {}, hh = {} }
+    local SH, e = Putt.SurfaceHeight, 2
+    local lo, hi = 1e18, -1e18
+    for j = 0, ny - 1 do
+        local y = j * res
+        for i = 0, nx - 1 do
+            local x = i * res
+            local n = j * nx + i + 1
+            local h0 = SH(list, x, y)
+            g.hh[n] = h0
+            g.gx[n] = (SH(list, x - e, y) - SH(list, x + e, y)) / (2 * e)
+            g.gy[n] = (SH(list, x, y - e) - SH(list, x, y + e)) / (2 * e)
+            if h0 < lo then lo = h0 end
+            if h0 > hi then hi = h0 end
+        end
+    end
+    g.lo, g.hi = lo, hi
+    if key then
+        surfCache[key] = surfCache[key] or {}
+        surfCache[key][mirror and 2 or 1] = g
+    end
+    return g
+end
+
+-- The pull of the green on a ball at (x, y): acceleration down the slope it is on.
+function Putt.Lie(hole, x, y)
+    local g = hole.surf
+    if not g then return 0, 0 end
+    local res, nx = g.res, g.nx
+    local fx, fy = x / res, y / res
+    local i, j = floor(fx), floor(fy)
+    if i < 0 then i = 0 elseif i > nx - 2 then i = nx - 2 end
+    if j < 0 then j = 0 elseif j > g.ny - 2 then j = g.ny - 2 end
+    local u, v = fx - i, fy - j
+    if u < 0 then u = 0 elseif u > 1 then u = 1 end
+    if v < 0 then v = 0 elseif v > 1 then v = 1 end
+    local n = j * nx + i + 1
+    local gx, gy = g.gx, g.gy
+    local a, b, c, d = (1 - u) * (1 - v), u * (1 - v), (1 - u) * v, u * v
+    return gx[n] * a + gx[n + 1] * b + gx[n + nx] * c + gx[n + nx + 1] * d,
+           gy[n] * a + gy[n + 1] * b + gy[n + nx] * c + gy[n + nx + 1] * d
+end
+
+-- How high the green stands at (x, y), for drawing it.
+function Putt.Height(hole, x, y)
+    local g = hole.surf
+    if not g then return 0 end
+    local res, nx = g.res, g.nx
+    local fx, fy = x / res, y / res
+    local i, j = floor(fx), floor(fy)
+    if i < 0 then i = 0 elseif i > nx - 2 then i = nx - 2 end
+    if j < 0 then j = 0 elseif j > g.ny - 2 then j = g.ny - 2 end
+    local u, v = min(1, max(0, fx - i)), min(1, max(0, fy - j))
+    local n = j * nx + i + 1
+    local hh = g.hh
+    return hh[n] * (1 - u) * (1 - v) + hh[n + 1] * u * (1 - v) + hh[n + nx] * (1 - u) * v + hh[n + nx + 1] * u * v
 end
 
 -- Rail relief: like the house rule of moving your ball a club-head off the wall,

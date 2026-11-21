@@ -33,7 +33,7 @@ local GAMES = Social.GAMES
 -- Gryphon Greens was made much harder in 2.2. Its times now travel under a new name, so they are
 -- never ranked against times set on the old, easier holes (older versions ignore the new name,
 -- and this one ignores the old).
-local GOLF_REV = "~2"
+local GOLF_REV = "~3"
 local function IsGolf(game) return game == "putt" or game:match("^pq_") ~= nil or game:match("^rt_%x+$") ~= nil end
 local function Wire(game) return IsGolf(game) and (game .. GOLF_REV) or game end
 local function Unwire(name)
