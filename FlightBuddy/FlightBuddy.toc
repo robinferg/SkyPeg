@@ -1,6 +1,6 @@
 ## Interface: 16001, 11507, 20505, 30405, 40402, 50500, 110207, 120001
 ## Title: Flight |cffff9e2eBuddy|r
-## Notes: A tavern full of minigames for your flight paths: Rune Breaker, Gryphon Greens mini golf, Featherbeard, High Tinker Pinball, Jewelcrafter's Bench, The Great Forge, Goblin Minefield and Death Roll. /fb
+## Notes: A tavern full of minigames for your flight paths: Rune Breaker, Gryphon Greens mini golf, Featherbeard, High Tinker Pinball, Jewelcrafter's Bench, Orb Cannon and Death Roll. /fb
 ## Author: Robin Ferguson
 ## Version: 2.4.0
 ## SavedVariables: FlightBuddyDB
@@ -39,9 +39,7 @@ Pinball.lua
 PinballUI.lua
 Gems.lua
 GemsUI.lua
-Forge.lua
-ForgeUI.lua
-Mines.lua
-MinesUI.lua
+Orbs.lua
+OrbsUI.lua
 Shell.lua
 Core.lua

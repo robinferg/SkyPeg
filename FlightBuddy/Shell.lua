@@ -16,9 +16,8 @@ Shell.TABS = {
     { key = "peg", full = "Rune Breaker", tip = "Shatter runes with Warcraft heroes", tok = "tok_runes", short = "Runes",   label = "Rune Breaker", icon = "Interface\\Icons\\INV_Misc_Rune_01", sub = "Rune Breaker", neon = { 1.0, 0.55, 0.15 } },
     { key = "putt", full = "Gryphon Greens", tip = "Mini golf against the clock", tok = "tok_greens",  label = "Greens",    icon = "Interface\\Icons\\INV_Misc_Orb_01",        sub = "Daily putt", daily = true, neon = { 0.35, 0.95, 0.45 } },
     { key = "gem", full = "Jewelcrafter's Bench", tip = "Cut gems three in a row", tok = "tok_gems",   label = "Jewelcrafter", short = "Gems", icon = "Interface\\Icons\\INV_Misc_Gem_01", sub = "Jewelcrafter's Bench", daily = true, neon = { 0.6, 0.8, 1 } },
-    -- (no tokens have been painted for the Forge or the Minefield yet: `glyph` puts a game icon on a blank token)
-    { key = "forge", full = "The Great Forge", tip = "Smelt bars two by two, all the way to Arcanite", glyph = "Interface\\Icons\\Trade_BlackSmithing", label = "Forge", short = "Forge", icon = "Interface\\Icons\\Trade_BlackSmithing", sub = "The Great Forge", daily = true, neon = { 1.0, 0.5, 0.2 } },
-    { key = "mines", full = "Goblin Minefield", tip = "Dig everything but the mines", glyph = "Interface\\Icons\\INV_Misc_Bomb_04", label = "Minefield", short = "Mines", icon = "Interface\\Icons\\INV_Misc_Bomb_04", sub = "Goblin Minefield", daily = true, neon = { 0.6, 0.95, 0.4 } },
+    -- (no token has been painted for Orb Cannon yet: `glyph` puts a picture on a blank token)
+    { key = "orbs", full = "Orb Cannon", tip = "Fire orbs, match three, bring the ceiling down", glyph = W.MEDIA .. "ball_arcane", glyphFull = true, label = "Orb Cannon", short = "Orbs", icon = W.MEDIA .. "ball_arcane", fullIcon = true, sub = "Orb Cannon", daily = true, neon = { 0.75, 0.5, 1.0 } },
     { key = "roll", full = "Death Roll", tip = "Wager gold on the roll of the dice", tok = "tok_roll",  label = "Death Roll", short = "Roll", icon = W.MEDIA .. "deathroll\\dr_icon", fullIcon = true, sub = "Death Roll", neon = { 1.0, 0.3, 0.25 } },
     { key = "flap", full = "Featherbeard", tip = "Fly a gryphon through Dun Morogh", tok = "tok_gryphon", short = "Gryphon",  label = "Featherbeard", icon = "Interface\\Icons\\Ability_Mount_Gryphon_01", sub = "Gryphon flight", neon = { 1.0, 0.75, 0.30 } },
     { key = "pin", full = "High Tinker Pinball", tip = "Gnomish pinball in Tinker Town", tok = "tok_pinball",   label = "Pinball", icon = "Interface\\Icons\\Trade_Engineering", sub = "High Tinker Pinball", neon = { 1.0, 0.55, 0.20 } },
@@ -28,7 +27,7 @@ local function InCombat() return InCombatLockdown and InCombatLockdown() end
 
 function Shell:Init(db)
     self.db = db
-    self.mods = { home = NS.Home, peg = NS.Peg, putt = NS.PuttUI, flap = NS.FlapUI, pin = NS.PinballUI, gem = NS.GemsUI, forge = NS.ForgeUI, mines = NS.MinesUI, roll = NS.DeathRollTab }
+    self.mods = { home = NS.Home, peg = NS.Peg, putt = NS.PuttUI, flap = NS.FlapUI, pin = NS.PinballUI, gem = NS.GemsUI, orbs = NS.OrbsUI, roll = NS.DeathRollTab }
 end
 
 function Shell:IsShown() return self.frame and self.frame:IsShown() end
@@ -178,7 +177,7 @@ function Shell:Build()
             b.glyph = b:CreateTexture(nil, "ARTWORK", nil, 2)
             b.glyph:SetPoint("CENTER")
             b.glyph:SetTexture(t.glyph)
-            b.glyph:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+            if not t.glyphFull then b.glyph:SetTexCoord(0.1, 0.9, 0.1, 0.9) end      -- game icons have a border to trim
             b.glyphK = 0.60          -- a square icon has to sit inside the ring; cut round it can be bigger
             if b.CreateMaskTexture and b.glyph.AddMaskTexture then
                 b.glyphK = 0.74

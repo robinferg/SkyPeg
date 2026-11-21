@@ -2,11 +2,13 @@
 
 ## 2.4.0
 
-**Two new games: The Great Forge and Goblin Minefield.** Both have a daily everyone plays, leaderboards, and a game that is saved after every move.
+**New game: Orb Cannon.** Aim with the pointer and fire orbs up into the ceiling; they bank off the side walls. Three or more of a kind that touch burst, and anything left hanging from nothing falls, which is where the big points are.
 
-- **The Great Forge.** Slide the bars on the anvil; two of the same metal smelt into the next one up, with the real bar icons: Copper, Tin, Bronze, Silver, Iron, Gold, Steel, Mithril, Truesilver, Thorium and at last Arcanite (and there is more past Arcanite for anyone who gets there). Arrow keys or WASD, drag across the anvil, or click near an edge. Two Reheats a forge take back your last move. The Daily Smelt gives everyone the same bars and 200 strikes
-- **Goblin Minefield.** Dig every square that has no mine under it, against the clock. Three fields (9 x 9, 12 x 12 and 16 x 16), a first dig that is always safe, flags with a right click, and a click on a number to dig round it once its flags are down. One Gnomish Mine Detector a field rings a safe square for ten seconds on your clock. The Daily Sweep is one field for everyone with the first hole already dug: each time it blows up adds 30 seconds to your next try, and your first clear is your time for the day
-- **The Tavern has room for them.** The games people play most now stand at the front: Rune Breaker, Gryphon Greens, Jewelcrafter's Bench, The Great Forge, Goblin Minefield and Death Roll, with Featherbeard and Pinball on the second page. `/fb forge` and `/fb mines` jump straight in
+- A shot that bursts nothing is a miss; run out of misses and the ceiling comes down a row. It is over when the orbs reach the line
+- Right-click (or click the waiting orb) to swap it into the cannon
+- Bursting shots in a row build a streak multiplier. Four in a row loads a Prismatic Orb that matches anything; dropping six at once loads a Goblin Bomb
+- Endless waves that get harder, and a Daily Salvo: one board for everyone, cleared in as few shots as you can
+- Leaderboards for both, and the game is saved after every shot. `/fb orbs` jumps straight in
 
 **Nothing you have earned gets lost.**
 
