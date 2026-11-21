@@ -936,7 +936,17 @@ function UI:Restart()
     local g = self.game
     if g.state == "idle" then return end
     if g.mode == "daily" then
-        self:Begin("daily")
+        local d = self:Daily()
+        if g.state == "play" and d.open and not d.done then
+            -- starting over is a failed try: say what it costs before it happens
+            self.card:Open({
+                title = "Start the Daily Sweep again?", color = TINT, center = true,
+                body = ("Walking away from a try counts as blowing up: your next one starts with |cffffcc40%d seconds|r more on the clock."):format(RETRY_COST),
+                buttons = { { "Start again", function() self:Begin("daily") end }, { "Keep digging", function() end, "ghost" } },
+            })
+        else
+            self:Begin("daily")
+        end
     else
         self:Begin("field", { size = g.size })
     end
@@ -947,6 +957,11 @@ end
 ---------------------------------------------------------------------------
 function UI:OnShow()
     self:RefreshHUD()
+    -- the first visit starts with how to play (its button leads on to the menu)
+    if not self.db.seenHelp then
+        self.db.seenHelp = true
+        if self.game.state ~= "play" then self:ShowHelp(); return end
+    end
     if self.game.state ~= "play" and not self.card:IsShown() and not self.boardPanel:IsShown() and #self.queue == 0 then self:ShowMenu() end
 end
 
@@ -982,7 +997,9 @@ function UI:ShowMenu()
         buttons[#buttons + 1] = { ("%s  %dx%d"):format(s.name, s.n, s.n), function() self:Begin("field", { size = s.key }) end, playing and "ghost" or nil }
     end
     if not (playing and g.mode == "daily") then
-        buttons[#buttons + 1] = { d.done and "Daily: cleared" or "Daily Sweep", function() self:Begin("daily") end }
+        -- a try left half done will cost its 30 seconds when the next one starts
+        local owed = RETRY_COST * ((d.fails or 0) + (d.open and 1 or 0))
+        buttons[#buttons + 1] = { d.done and "Daily: cleared" or (owed > 0 and ("Daily Sweep  +%ds"):format(owed) or "Daily Sweep"), function() self:Begin("daily") end }
     end
     if #buttons < 6 then buttons[#buttons + 1] = { "Leaderboards", function() self:ShowBoard() end } end
     local options = NS.CommonOptions()
@@ -1024,12 +1041,11 @@ function UI:ShowHelp()
             "",
             "A dug square shows how many of the eight squares round it are mined. A blank one opens everything round it. Your first dig is always safe.",
             "",
-            "|cffffcc40Left click|r digs. |cffffcc40Right click|r plants a flag on a square you think is mined (Shift-click or the Flags button does the same).",
-            "Click a |cffffcc40number|r that already has that many flags round it to dig the rest at once.",
+            "|cffffcc40Left click|r digs. |cffffcc40Right click|r plants a flag (so does Shift-click, or the Flags button). Click a |cffffcc40number|r with that many flags round it to dig the rest at once.",
             "",
             ("The |cffffcc40Detector|r rings one safe square, once a field, for %d seconds on your clock."):format(Mines.DETECT_COST),
             "",
-            ("|cffffcc40Daily Sweep|r: one field for everyone, with the first hole already dug. Each time it blows up adds %d seconds to your next try, and your first clear is your time for the day."):format(RETRY_COST),
+            ("|cffffcc40Daily Sweep|r: one field for everyone. Each time it blows up adds %d seconds to your next try; your first clear is your time for the day."):format(RETRY_COST),
         }, "\n"),
         buttons = { { "Start digging", function() if self.game.state ~= "play" then self:ShowMenu() end end } },
     })

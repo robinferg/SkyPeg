@@ -878,6 +878,11 @@ end
 ---------------------------------------------------------------------------
 function UI:OnShow()
     self:RefreshHUD()
+    -- the first visit starts with how to play (its button leads on to the menu)
+    if not self.db.seenHelp then
+        self.db.seenHelp = true
+        if self.game.state ~= "play" then self:ShowHelp(); return end
+    end
     if self.game.state ~= "play" and not self.card:IsShown() and not self.boardPanel:IsShown() then self:ShowMenu() end
 end
 
