@@ -113,10 +113,12 @@ function UI:Init(db)
     db.daily = db.daily or {}        -- [day] = { best = seconds, tries = n, strokes = n, par = n }
     db.locker = db.locker or { ball = "pebble", club = "training" }
     db.holes, db.aces, db.dailies, db.underPar = db.holes or 0, db.aces or 0, db.dailies or 0, db.underPar or 0
-    -- Progress is never reset by an update. The one exception, long past: best times set before
-    -- 2.2 came from holes with no scoring floor (whole flight routes in 0 seconds), which nobody
-    -- could ever beat, so those were retired once. Anything set since then stays, whatever changes.
-    if (db.rev or 0) < 2 then
+    -- When the courses themselves change, best times set on the old ones are retired (stats, unlocks
+    -- and the flight log stay) and a round saved part-way through the old holes is dropped: 2.2 made
+    -- every hole harder, 2.3 reshaped every green, 2.3.1 made the slopes much stronger. Nothing else
+    -- in Flight Buddy is ever reset.
+    if db.rev ~= 4 then
+        db.rev = 4
         db.quickBest, db.courseBest, db.round = nil, nil, nil
         local d = db.daily[NS.Social.Today()]
         if d and d.best then d.best, d.strokes, d.par = nil, nil, nil; db.dailies = math.max(0, db.dailies - 1) end
@@ -124,7 +126,6 @@ function UI:Init(db)
             if type(e) == "table" then e.best, e.strokes = nil, nil end
         end
     end
-    db.rev = 3
     local handlers = {}
     for ev, fn in pairs(self.Events) do
         handlers[ev] = function(...) if self.frame then fn(self, ...) end end

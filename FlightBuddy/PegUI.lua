@@ -254,7 +254,10 @@ function UI:SaveRun()
         self.db.run = { v = 1, seed = g.runSeed, level = g.level, score = 0,
                         levelStartScore = 0, balls = C.BALLS, bestShot = g.bestShot }
     else
-        self.db.run = g:Serialize()
+        -- never save "nothing" over a run: between shots this is the board as it stands, mid-shot
+        -- it is the board as it stood before the ball was fired
+        local snap = g:Serialize()
+        if snap then self.db.run = snap end
     end
     self:RecordLevelScore()
 end

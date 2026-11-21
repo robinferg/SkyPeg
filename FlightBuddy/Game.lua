@@ -133,6 +133,8 @@ function Game:NewRun(seed)
     self.score = 0
     self.bestShot = 0
     self:StartLevel()
+    self.saved = nil
+    self:Serialize()
 end
 
 function Game:StartLevel(mask)
@@ -214,6 +216,11 @@ function Game:Restore(s)
     if self.orangeLit >= self.orangeTotal or self.ballsLeft <= 0 then
         self:StartLevel() -- saved state was terminal; just replay the level
     end
+    -- what was just restored is the fallback for a save asked for while a ball is in flight
+    -- (Serialize only works between shots): without it, closing the window during the first shot
+    -- of a session saved nothing at all and the run was gone at the next login
+    self.saved = nil
+    self:Serialize()
     return true
 end
 

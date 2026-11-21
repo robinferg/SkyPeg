@@ -33,7 +33,7 @@ local GAMES = Social.GAMES
 -- Gryphon Greens was made much harder in 2.2. Its times now travel under a new name, so they are
 -- never ranked against times set on the old, easier holes (older versions ignore the new name,
 -- and this one ignores the old).
-local GOLF_REV = "~3"
+local GOLF_REV = "~4"
 local function IsGolf(game) return game == "putt" or game:match("^pq_") ~= nil or game:match("^rt_%x+$") ~= nil end
 local function Wire(game) return IsGolf(game) and (game .. GOLF_REV) or game end
 local function Unwire(name)
@@ -264,12 +264,11 @@ function Social:Init(db)
     for r in pairs(known or {}) do ourRealms[r] = true end
     QuietFilter()
     self:Tidy()
-    -- Boards are never cleared by an update. The one exception, long past: golf times heard before
-    -- 2.2 (no scoring floor: whole routes in 0 seconds) were dropped once.
-    if db.golfRev == nil then
+    -- golf times heard on courses that have since changed go (see GOLF_REV); no other board is ever cleared
+    if db.golfRev ~= GOLF_REV then
+        db.golfRev = GOLF_REV
         for game in pairs(db.boards or {}) do if IsGolf(game) then db.boards[game] = nil end end
     end
-    db.golfRev = GOLF_REV
 end
 
 -- Results stored under another spelling of our realm are moved to the one spelling we use; any that

@@ -2,9 +2,11 @@
 
 ## 2.3.1
 
+- **Gryphon Greens: the slopes mean it now.** Leaning greens are much steeper, close to the steepest a ball can still stop on, so a soft putt breaks about twice as far as a firm one: hit hard through the break, or play it soft and let the green carry it. Climbs are far taller and longer: a normal putt dies on the way up and rolls back, so a big hill has to be hit like one. Every hole re-tested and given a new par
+- **Rune Breaker no longer loses your run.** Closing the window while the first ball of a session was still in flight (a flight landing mid-shot did it) saved nothing, and the next login started you again at level 1. A run now survives closing or logging out at any moment
 - **Death Roll: an accepted challenge now starts on both screens.** The challenger could be left on "Waiting for ... to accept" while the other player was already in the game, because the two games spelled the realm differently and so did not recognise each other. Flight Buddy now learns how the server writes your realm a few seconds after login, recognises the answer to a challenge it just sent, repeats an accept until the other game confirms it, and retries a whisper the server could not deliver. The same fix applies to golf Versus invites
 - **Death Roll shows your opponent's character.** When they are standing with you the pit shows them exactly as they are. When they are somewhere else it now shows their race and what they are wearing, sent with the challenge and remembered for next time, instead of a class crest. `/deathroll look` shows what your opponents will see of you
-- **Updates no longer reset anything.** Best times, route bests and score boards are kept from this version on, whatever changes later
+- Because the greens changed, golf best times and golf score boards start fresh once more. Nothing else is reset, and from now on golf only resets when the courses themselves change
 
 ## 2.3.0
 
