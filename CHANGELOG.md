@@ -1,6 +1,19 @@
 # Flight Buddy changelog
 
-## 2.1.1
+## 2.2.0
+
+**Gryphon Greens is a much harder, much more interesting game.** The holes had become so easy that a strong player could bank a whole round down to 0 seconds. Every one of the 54 holes has been rebuilt on its existing layout:
+
+- **Greens with contours, like real putting.** Rises and hollows are shaded into the felt, with chevrons drifting downhill so you can read them. A putt across a slope breaks downhill, and breaks more the slower it rolls. Putt up a steep rise too softly and the ball runs out of pace and rolls back down; hit it firmly and it goes over the top
+- **Crowned cups and punchbowls.** Some cups sit on a level crown with a slope all round (too soft comes back to you, too firm runs off the far side); others lie at the bottom of a punchbowl that gathers anything over its lip
+- **Walls and posts on every hole.** Low stone walls jut off the curbs to close the straight lines and make chicanes, and posts stand in the lanes and guard the cups
+- **More creatures on the course.** Holes that had nothing moving now have one of the locals walking the lane: kobolds at Northshire, a harvest golem at Westfall, rams, yetis, kodos, harpies, ghouls, wisps and more
+- **Honest pars**, set by play-testing every rebuilt hole
+- **Bonuses can take off at most half your time**, so no round can be banked down to nothing
+- Best times set on the old holes are retired: course, route and today's daily bests start fresh, and new times are never ranked against times from older versions. Your stats, unlocks and flight log are kept
+- Versus needs both players on this version (the game tells you if they are not)
+
+Also in this version:
 
 - **Tavern: the games are much easier to see.** Three large cabinets to a row with each game's name on a big brass plate and your progress written beneath; the shelf is gone and the wall behind is darker so the games stand out
 - Larger writing on the marquee, the chalkboard, the notice board and the keeper's scroll

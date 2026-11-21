@@ -1224,7 +1224,7 @@ NS.PuttCourses.arathi = { key = "arathi", name = "Arathi Highlands", holes = {
         tee = { 240, 451 },
         cup = { 239, 87 },
         bumpers = {  },
-        portals = { { ax = 161, ay = 371, bx = 240, by = 131, r = 8, dx = 0, dy = -1, adx = -0.57, ady = 0.82, exit = 150 } },
+        portals = { { ax = 161, ay = 371, bx = 240, by = 131, r = 8, dx = 0.5, dy = -0.87, adx = -0.57, ady = 0.82, exit = 150 } },
         extra = { coins = {  } },
         ramps = {  },
         movers = {  },

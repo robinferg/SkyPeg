@@ -30,6 +30,21 @@ setmetatable(Social.GAMES, { __index = function(_, k)
 end })
 local GAMES = Social.GAMES
 
+-- Gryphon Greens was made much harder in 2.2. Its times now travel under a new name, so they are
+-- never ranked against times set on the old, easier holes (older versions ignore the new name,
+-- and this one ignores the old).
+local GOLF_REV = "~2"
+local function IsGolf(game) return game == "putt" or game:match("^pq_") ~= nil or game:match("^rt_%x+$") ~= nil end
+local function Wire(game) return IsGolf(game) and (game .. GOLF_REV) or game end
+local function Unwire(name)
+    if type(name) ~= "string" then return nil end
+    local g = name:match("^(.-)~(%d+)$")
+    if g then return (IsGolf(g) and name == g .. GOLF_REV) and g or nil end
+    if IsGolf(name) then return nil end
+    return name
+end
+Social.IsGolf = IsGolf
+
 local queue, sendAcc = {}, 0
 Social.listeners = {}
 local lastQuery = {}
@@ -193,6 +208,11 @@ function Social:Init(db)
     for r in pairs(known or {}) do ourRealms[r] = true end
     QuietFilter()
     self:Tidy()
+    -- times heard before the holes were made harder go (see GOLF_REV)
+    if db.golfRev ~= GOLF_REV then
+        db.golfRev = GOLF_REV
+        for game in pairs(db.boards or {}) do if IsGolf(game) then db.boards[game] = nil end end
+    end
 end
 
 -- Results stored under another spelling of our realm are moved to the one spelling we use; any that
@@ -317,7 +337,7 @@ function Social:Submit(game, day, score, detail)
     if GAMES[game] == "low" then score = math.floor(score * 10 + 0.5) / 10 else score = math.floor(score) end
     self:Store(game, day, Social.Me(), score, detail, "me")
     if self.db.settings and self.db.settings.share == false then return end
-    Broadcast(table.concat({ VERSION, "R", game, day, score, detail or "" }, ";"))
+    Broadcast(table.concat({ VERSION, "R", Wire(game), day, score, detail or "" }, ";"))
 end
 
 -- a score for today's board and the all-time board
@@ -332,7 +352,7 @@ function Social:Query(game, day)
     local now = GetTime()
     if lastQuery[k] and now - lastQuery[k] < 90 then return end
     lastQuery[k] = now
-    Broadcast(table.concat({ VERSION, "Q", game, day }, ";"))
+    Broadcast(table.concat({ VERSION, "Q", Wire(game), day }, ";"))
 end
 
 function Social:Mine(game, day)
@@ -349,7 +369,8 @@ end
 function Social:OnMessage(prefix, text, channel, sender)
     if prefix ~= PREFIX or type(text) ~= "string" then return end
     local v, kind, game, day, score, detail, name = strsplit(";", text)
-    if v ~= VERSION or not GAMES[game] or not ValidDay(day) then return end
+    game = Unwire(game)
+    if v ~= VERSION or not game or not GAMES[game] or not ValidDay(day) then return end
     sender = Full(sender)
     if not sender then return end
     -- a whisper is from a friend only if they're on your friends list: replies to a realm-wide
@@ -381,7 +402,7 @@ function Social:OnMessage(prefix, text, channel, sender)
                 if now - lastRealmReply < 20 then return end
                 lastRealmReply = now
             end
-            local msg = table.concat({ VERSION, "R", game, day, mine.s, mine.d or "" }, ";")
+            local msg = table.concat({ VERSION, "R", Wire(game), day, mine.s, mine.d or "" }, ";")
             local delay = 0.5 + math.random() * 4
             if C_Timer and C_Timer.After then
                 C_Timer.After(delay, function() Send(msg, "WHISPER", sender) end)
@@ -398,7 +419,7 @@ function Social:OnMessage(prefix, text, channel, sender)
                 local n = 0
                 for _, e in ipairs(self:Board(game, day, "realm")) do
                     if not e.me and e.name ~= sender then
-                        local msg = table.concat({ VERSION, "T", game, day, e.s, e.d or "", e.name }, ";")
+                        local msg = table.concat({ VERSION, "T", Wire(game), day, e.s, e.d or "", e.name }, ";")
                         local delay = 1 + math.random() * 5 + n * 0.4
                         if C_Timer and C_Timer.After then
                             C_Timer.After(delay, function() Send(msg, "WHISPER", sender) end)

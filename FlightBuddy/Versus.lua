@@ -110,7 +110,7 @@ function V.Fingerprint(c)
     local s = 17
     for _, h in ipairs(c.holes) do
         s = (s * 31 + h.par * 7 + floor(h.tee.x) + floor(h.tee.y) * 3 + floor(h.cup.x) * 5 + floor(h.cup.y) * 11
-            + #(h.movers or {}) * 13 + #(h.actors or {}) * 19) % 1000003
+            + #(h.movers or {}) * 13 + #(h.actors or {}) * 19 + #(h.walls or {}) * 23 + #(h.bumpers or {}) * 29 + #(h.contours or {}) * 37) % 1000003
     end
     return s
 end
@@ -336,7 +336,7 @@ function V:OnFinish(game, adj, strokes, par)
     if not self:Playing(game) then return nil end
     local m = self.match
     local me = m.players[m.me]
-    local final = max(0, (GetTime() - m.t0) + (adj or 0))
+    local final = NS.Putt.FinalTime(GetTime() - m.t0, adj)
     me.final, me.status, me.total = final, "done", strokes
     self:SendAll("F", m.id, floor(final * 1000 + 0.5), strokes, par)
     self:CheckOver()

@@ -14,13 +14,15 @@ local P = {
     MAX_SPEED = 900, POWER_CURVE = 1.3,  -- roll distance = full distance * power^1.3 (half pull ~ 40%)
     DECEL = 95, DRAG = 0.50,   -- lighter rolling resistance + speed drag: smooth roll-outs, no dead stop
     STEP = 1 / 240, MAX_STEPS = 96,
-    STOP = 3, SINK_SPEED = 250, SINK_SPEED_LONG = 120,   -- the ball must arrive gently to drop: long putts that come in hot lip out
+    STOP = 3, SINK_SPEED = 220, SINK_SPEED_LONG = 120,   -- the ball must arrive gently to drop: long putts that come in hot lip out
+    LIP = 0.4,          -- ...and gentler still off-centre: a ball catching the edge of the cup drops at this much less pace than one dead centre
     WALL_E = 0.78, BUMP_E = 0.86,
     SLOPE = 45, BOOST = 1100, BOOST_MAX = 500,
     MAX_STROKES = 8,
     STROKE_SEC = 5,     -- each stroke under par takes this much off your time (over par adds it)
     ACE_SEC = 5,        -- extra bonus for a hole-in-one
     COIN_SEC = 3,       -- a lucky coin picked up on the way takes this much off your time
+    MAX_BONUS = 0.5,    -- bonuses can take off at most this share of your clock
     SHOT_TIMEOUT = 14,
     HOLES = 6,
     WOBBLE_FROM = 0.75,          -- above this power the putt starts losing accuracy...
@@ -29,6 +31,7 @@ local P = {
     RELIEF = 20,                 -- a ball that stops against a rail is eased this far (centre) off it
     TUNNEL_EXIT = 190,           -- minimum speed a ball leaves a tunnel with
     FAN = 6,                     -- fan strength multiplier: strong enough to bend a putt and carry a stopped ball
+    FENCE_T = 3.5,               -- half the thickness of an added wall (PuttHard.lua "walls")
 }
 Putt.C = P
 
@@ -262,6 +265,34 @@ local function BuildPainted(tpl, seed, mirror, rng)
             h.bumpers[#h.bumpers + 1] = { x = X(b[1]), y = b[2], r = b[3], baked = true, kick = b[4] }
         end
         if ex.tip then h.tip = ex.tip end
+    end
+    -- ex.walls: low walls added to the painted hole, each a straight bar { x1, y1, x2, y2 } as thick
+    -- as the hole's own curb. Solid on every side; drawn by the UI in the curb's colour.
+    h.fences = {}
+    h.curb = tpl.curb
+    for _, f in ipairs(ex and ex.walls or {}) do
+        local x1, y1, x2, y2 = X(f[1]), f[2], X(f[3]), f[4]
+        local dx, dy = x2 - x1, y2 - y1
+        local l = sqrt(dx * dx + dy * dy)
+        if l > 1 then
+            local T = P.FENCE_T
+            local nx, ny = -dy / l * T, dx / l * T
+            local a1, a2, b1, b2 = x1 + nx, y1 + ny, x2 + nx, y2 + ny
+            local c1, c2, d1, d2 = x2 - nx, y2 - ny, x1 - nx, y1 - ny
+            h.walls[#h.walls + 1] = { a1, a2, b1, b2, fence = true }
+            h.walls[#h.walls + 1] = { b1, b2, c1, c2, fence = true }
+            h.walls[#h.walls + 1] = { c1, c2, d1, d2, fence = true }
+            h.walls[#h.walls + 1] = { d1, d2, a1, a2, fence = true }
+            h.fences[#h.fences + 1] = { x1, y1, x2, y2 }
+        end
+    end
+    -- ex.contours: the lie of the green. A rise ({ x, y, r, a > 0 }) pushes the ball away from its
+    -- crest, a hollow (a < 0) draws it in; a is the pull at the steepest part of the flank, and when
+    -- that beats rolling resistance a ball cannot stop there: it rolls back down. flat is the share
+    -- of the radius that is level on top (a crowned cup sits on it).
+    h.contours = {}
+    for _, c in ipairs(ex and ex.contours or {}) do
+        h.contours[#h.contours + 1] = { x = X(c.x), y = c.y, r = c.r, a = c.a, flat = c.flat or 0, cup = c.cup }
     end
     -- signature hazards (mages, ghouls, war drums, whirlwinds, tide pools): see Putt:StepActors
     h.actors = {}
@@ -1453,6 +1484,13 @@ function Putt:Step(h)
     -- slopes and boost pads
     local ax, ay = 0, 0
     if t.slope then ax, ay = t.slope[1] * P.SLOPE, t.slope[2] * P.SLOPE end
+    -- rises and hollows: gravity down the flank
+    local lie = 0
+    if hole.contours and hole.contours[1] then
+        local cx, cy = Putt.Lie(hole, b.x, b.y)
+        ax, ay = ax + cx, ay + cy
+        lie = sqrt(cx * cx + cy * cy)
+    end
     if t.boost then
         local along = b.vx * t.boost[1] + b.vy * t.boost[2]
         if along < P.BOOST_MAX then ax, ay = ax + t.boost[1] * P.BOOST, ay + t.boost[2] * P.BOOST end
@@ -1507,6 +1545,9 @@ function Putt:Step(h)
     -- every putt after that gets the normal, forgiving cup.
     local strict = (self.strokes == 1) and min(1, max(0, ((b.travel or 0) - 150) / 250)) or 0
     local sinkSpeed = P.SINK_SPEED - (P.SINK_SPEED - P.SINK_SPEED_LONG) * strict
+    -- like a real cup, the middle takes a firmer putt than the edge: catch the lip too fast and it spins out
+    local off = min(1, cd / (P.CUP_R - 2))
+    sinkSpeed = sinkSpeed * (1 - P.LIP * off * off)
     if cd < P.CUP_R + 5 and sp < 170 - 90 * strict and cd > 0.01 then
         local pull = (520 - 220 * strict) * (1 - cd / (P.CUP_R + 5))
         b.vx, b.vy = b.vx + cdx / cd * pull * h, b.vy + cdy / cd * pull * h
@@ -1602,13 +1643,35 @@ function Putt:Step(h)
     -- come to rest
     sp = sqrt(b.vx * b.vx + b.vy * b.vy)
     if sp < P.STOP * 3 then b.still = (b.still or 0) + h else b.still = 0 end
-    local resting = (sp < P.STOP and not t.boost and not b.windy and (not t.slope or (t.decel or P.DECEL) > P.SLOPE * max(abs(t.slope[1]), abs(t.slope[2]))))
-        or b.still > 0.7
+    local resting = (sp < P.STOP and not t.boost and not b.windy and lie < (t.decel or P.DECEL)
+            and (not t.slope or (t.decel or P.DECEL) > P.SLOPE * max(abs(t.slope[1]), abs(t.slope[2]))))
+        or (b.still > 0.7 and lie < (t.decel or P.DECEL))
     b.windy = false
     if resting or b.age > P.SHOT_TIMEOUT then
         b.vx, b.vy = 0, 0
         self:Rest()
     end
+end
+
+-- The pull of the green's contours on a ball at (x, y): acceleration down the flank of every rise
+-- and hollow it is on. Zero on the level top of a rise and at the bottom of a hollow.
+function Putt.Lie(hole, x, y)
+    local ax, ay = 0, 0
+    local list = hole.contours or {}
+    for i = 1, #list do
+        local c = list[i]
+        local dx, dy = x - c.x, y - c.y
+        local d2 = dx * dx + dy * dy
+        if d2 < c.r * c.r and d2 > 1e-6 then
+            local d = sqrt(d2)
+            local u = d / c.r
+            if u > c.flat then
+                local k = c.a * sin(pi * (u - c.flat) / (1 - c.flat)) / d
+                ax, ay = ax + dx * k, ay + dy * k
+            end
+        end
+    end
+    return ax, ay
 end
 
 -- Rail relief: like the house rule of moving your ball a club-head off the wall,
@@ -1704,7 +1767,8 @@ function Putt:Relief()
         for k = 0, n - 1 do
             local a = k * 2 * pi / n
             local x, y = x0 + cos(a) * ring, y0 + sin(a) * ring
-            if Putt.Clearance(hole, x, y) >= D and safeGround(hole, x, y)
+            local lx, ly = Putt.Lie(hole, x, y)
+            if Putt.Clearance(hole, x, y) >= D and safeGround(hole, x, y) and lx * lx + ly * ly < P.DECEL * P.DECEL
                 and (x - cup.x) ^ 2 + (y - cup.y) ^ 2 >= (P.CUP_R + 10) ^ 2 then
                 -- keep the ball on the same side of every rail (no hopping through walls)
                 local crosses = false
@@ -1857,9 +1921,15 @@ function Putt:Totals()
     return strokes, par, adj
 end
 
+-- The time that goes on the board: your clock, plus penalty strokes, less bonuses. Bonuses can take
+-- off at most half the clock, so no run of birdies and coins ever banks a round down to nothing.
+function Putt.FinalTime(elapsed, adj)
+    return max(elapsed * (1 - P.MAX_BONUS), elapsed + (adj or 0))
+end
+
 function Putt:Finish()
     local strokes, par, adj = self:Totals()
-    self.final = max(0, self.elapsed + adj)
+    self.final = Putt.FinalTime(self.elapsed, adj)
     self.state = "done"
     self:Emit("done", self.final, self.elapsed, adj, strokes, par)
 end

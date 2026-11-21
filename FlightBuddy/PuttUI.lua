@@ -15,8 +15,10 @@ local floor, min, max, abs, sin, cos, pi, sqrt = math.floor, math.min, math.max,
 local atan2 = math.atan2
 local CANVAS_X, CANVAS_Y = 20, -110
 local DRAG_FULL = 110 -- pixels of pull for a full-power putt (pulling further stays at full)
-local PATROL_RIDERS = { gnoll = "gnoll", alliance = "footman", dwarf = "dwarf", wolf = "prowler", gnome = "gnome", nelf = "maiev", orc = "grommash", troll = "darkspear", undead = "stitches", turtle = "turtle", syndicate = "defias", raider = "troll", ram = "ram", ghoul = "ghoul", kodo = "kodo", harpy = "harpy", murloc = "murloc", murlocb = "murloc_blue", raptor = "strider" }
-local RIDER_TINT = { ghoul = { 0.45, 0.60, 0.40 }, kodo = { 0.55, 0.42, 0.30 }, harpy = { 0.60, 0.30, 0.55 }, ram = { 0.55, 0.62, 0.75 }, turtle = { 0.35, 0.55, 0.25 }, syndicate = { 0.70, 0.35, 0.10 }, raider = { 0.80, 0.22, 0.16 }, gnoll = { 0.62, 0.42, 0.22 }, dwarf = { 0.75, 0.55, 0.25 }, wolf = { 0.55, 0.30, 0.18 }, gnome = { 0.85, 0.55, 0.20 }, nelf = { 0.55, 0.35, 0.80 }, orc = { 0.75, 0.20, 0.15 }, troll = { 0.20, 0.65, 0.60 }, undead = { 0.40, 0.55, 0.25 } } -- little figures that ride the patrol tokens
+local PATROL_RIDERS = { gnoll = "gnoll", alliance = "footman", dwarf = "dwarf", wolf = "prowler", gnome = "gnome", nelf = "maiev", orc = "grommash", troll = "darkspear", undead = "stitches", turtle = "turtle", syndicate = "defias", raider = "troll", ram = "ram", ghoul = "ghoul", kodo = "kodo", harpy = "harpy", murloc = "murloc", murlocb = "murloc_blue", raptor = "strider",
+    kobold = "kobold", golem = "golem", yeti = "yeti", sheep = "sheep", elemental = "earthele" }
+local RIDER_TINT = { ghoul = { 0.45, 0.60, 0.40 }, kodo = { 0.55, 0.42, 0.30 }, harpy = { 0.60, 0.30, 0.55 }, ram = { 0.55, 0.62, 0.75 }, turtle = { 0.35, 0.55, 0.25 }, syndicate = { 0.70, 0.35, 0.10 }, raider = { 0.80, 0.22, 0.16 }, gnoll = { 0.62, 0.42, 0.22 }, dwarf = { 0.75, 0.55, 0.25 }, wolf = { 0.55, 0.30, 0.18 }, gnome = { 0.85, 0.55, 0.20 }, nelf = { 0.55, 0.35, 0.80 }, orc = { 0.75, 0.20, 0.15 }, troll = { 0.20, 0.65, 0.60 }, undead = { 0.40, 0.55, 0.25 },
+    kobold = { 0.60, 0.45, 0.25 }, golem = { 0.70, 0.50, 0.20 }, yeti = { 0.70, 0.80, 0.90 }, sheep = { 0.45, 0.60, 0.35 }, elemental = { 0.55, 0.40, 0.28 } } -- little figures that ride the patrol tokens
 
 ---------------------------------------------------------------------------
 -- Look
@@ -111,6 +113,17 @@ function UI:Init(db)
     db.daily = db.daily or {}        -- [day] = { best = seconds, tries = n, strokes = n, par = n }
     db.locker = db.locker or { ball = "pebble", club = "training" }
     db.holes, db.aces, db.dailies, db.underPar = db.holes or 0, db.aces or 0, db.dailies or 0, db.underPar or 0
+    -- 2.2 made every hole much harder: best times set on the old holes are retired (your stats,
+    -- unlocks and flight log stay), and a round saved part-way through the old holes is dropped
+    if db.rev ~= 2 then
+        db.rev = 2
+        db.quickBest, db.courseBest, db.round = nil, nil, nil
+        local d = db.daily[NS.Social.Today()]
+        if d and d.best then d.best, d.strokes, d.par = nil, nil, nil; db.dailies = math.max(0, db.dailies - 1) end
+        for _, e in pairs((NS.db and NS.db.routes) or {}) do
+            if type(e) == "table" then e.best, e.strokes = nil, nil end
+        end
+    end
     local handlers = {}
     for ev, fn in pairs(self.Events) do
         handlers[ev] = function(...) if self.frame then fn(self, ...) end end
@@ -830,6 +843,7 @@ local function Bar(t, cv, x1, y1, x2, y2, thick)
 end
 
 local GOO = { default = { 0.55, 0.95, 0.2 }, voodoo = { 0.75, 0.35, 1 } }
+local CURB = { 0.74, 0.71, 0.66 }   -- an added wall's colour when the hole doesn't say (PuttHard.lua "curb")
 
 function UI:DrawHazards(el)
     local g, cv = self.game, self.canvas
@@ -894,6 +908,75 @@ function UI:DrawHazards(el)
             local t = self:Hz("coin", "flap\\coin", "ARTWORK", 6)
             local sq = calm and 1 or (0.55 + 0.45 * abs(cos(rt * 2.4 + c.y)))
             t:SetSize(18 * sq, 18); t:SetPoint("CENTER", cv, "TOPLEFT", c.x, -(c.y + bob))
+        end
+    end
+    -- the lie of the green (PuttHard.lua "contours"): a rise is lit from the top left like a low
+    -- dome, a hollow the other way round; thin rings mark the height and chevrons run downhill
+    for ci, c in ipairs(h.contours or {}) do
+        local rise = c.a > 0
+        local d = c.r * 2
+        local sh = self:Hz("lshade", "shade", "ARTWORK", -4)
+        sh:SetSize(d, d); sh:SetPoint("CENTER", cv, "TOPLEFT", c.x, -c.y)
+        if not rise and sh.SetRotation then sh:SetRotation(pi) end
+        local steep = min(1, abs(c.a) / 190)
+        sh:SetAlpha(0.34 + 0.24 * steep)
+        if not rise then
+            local pit = self:Hz("lpit", "glow", "ARTWORK", -4)
+            pit:SetSize(d * 0.8, d * 0.8); pit:SetPoint("CENTER", cv, "TOPLEFT", c.x, -c.y)
+            pit:SetVertexColor(0, 0.05, 0, 0.30 + 0.2 * steep)
+        else
+            local top = self:Hz("ltop", "glow", "ARTWORK", -4, "ADD")
+            top:SetSize(d * 0.75, d * 0.75); top:SetPoint("CENTER", cv, "TOPLEFT", c.x - c.r * 0.12, -(c.y - c.r * 0.12))
+            top:SetVertexColor(0.9, 1, 0.6, 0.07 + 0.05 * steep)
+        end
+        for k, f in ipairs({ 1, 0.66, (c.flat > 0.1) and c.flat or 0.34 }) do
+            local ring = self:Hz("lring", "shock", "ARTWORK", -3)
+            ring:SetSize(d * f, d * f); ring:SetPoint("CENTER", cv, "TOPLEFT", c.x, -c.y)
+            if rise then ring:SetVertexColor(0.04, 0.16, 0.04, 0.30 - k * 0.04) else ring:SetVertexColor(0.02, 0.10, 0.02, 0.26 + k * 0.05) end
+        end
+        -- which way a ball will roll: chevrons drifting down the flank
+        local n = c.r >= 40 and 8 or 6
+        for k = 1, n do
+            local an = (k - 1) * 2 * pi / n + ci * 0.7
+            local ph = calm and 0.5 or ((rt * 0.28 + k * 0.37) % 1)
+            local u = c.flat + (1 - c.flat) * (rise and (0.18 + 0.7 * ph) or (0.88 - 0.7 * ph))
+            local x, y = c.x + cos(an) * c.r * u, c.y + sin(an) * c.r * u
+            local ch = self:Hz("lchev", "t_chevron", "ARTWORK", -2)
+            ch:SetSize(13, 13); ch:SetPoint("CENTER", cv, "TOPLEFT", x, -y)
+            local dx, dy = cos(an) * (rise and 1 or -1), sin(an) * (rise and 1 or -1)
+            if ch.SetRotation then ch:SetRotation(-atan2(dx, -dy)) end
+            ch:SetVertexColor(0.95, 1, 0.8, (calm and 0.6 or sin(ph * pi)) * (0.5 + 0.3 * steep))
+        end
+    end
+    -- added walls (PuttHard.lua): a course of stone blocks in the colour of the hole's own curb
+    if h.fences and #h.fences > 0 then
+        local cb = h.curb or CURB
+        local T = Putt.C.FENCE_T
+        for _, f in ipairs(h.fences) do
+            local x1, y1, x2, y2 = f[1], f[2], f[3], f[4]
+            local dx, dy = x2 - x1, y2 - y1
+            local len = sqrt(dx * dx + dy * dy)
+            local ux, uy = dx / len, dy / len
+            local sh = self:Hz("fsh", "pill", "ARTWORK", 1)
+            Bar(sh, cv, x1 + 2, y1 + 3.5, x2 + 2 + ux, y2 + 3.5 + uy, T * 2 + 3)
+            sh:SetVertexColor(0, 0, 0, 0.32)
+            local n = max(2, floor(len / 10 + 0.5))
+            local step = len / n
+            for k = 0, n - 1 do
+                local ax, ay = x1 + ux * step * k, y1 + uy * step * k
+                local bx, by = x1 + ux * step * (k + 1), y1 + uy * step * (k + 1)
+                local edge = self:Hz("fedge", "pill", "ARTWORK", 2)
+                Bar(edge, cv, ax - ux * 0.4, ay - uy * 0.4, bx + ux * 0.4, by + uy * 0.4, T * 2 + 1.6)
+                edge:SetVertexColor(cb[1] * 0.42, cb[2] * 0.40, cb[3] * 0.40)
+                -- every other block a shade lighter, like laid stone
+                local m = (k % 2 == 0) and 1 or 0.93
+                local body = self:Hz("fbody", "pill", "ARTWORK", 3)
+                Bar(body, cv, ax + ux * 0.7, ay + uy * 0.7, bx - ux * 0.7, by - uy * 0.7, T * 2 - 0.6)
+                body:SetVertexColor(cb[1] * m, cb[2] * m, cb[3] * m)
+                local hi = self:Hz("fhi", "pill", "ARTWORK", 4)
+                Bar(hi, cv, ax + ux * 1.6, ay + uy * 1.6 - 1.4, bx - ux * 1.6, by - uy * 1.6 - 1.4, 2.2)
+                hi:SetVertexColor(min(1, cb[1] * 1.16), min(1, cb[2] * 1.16), min(1, cb[3] * 1.16), 0.85)
+            end
         end
     end
     -- sliders (mine carts, assembly arms): a pill along the bar's own line, wherever it points
@@ -1467,7 +1550,7 @@ function E:done(final, elapsed, adj, strokes, par)
         local spec = c.route
         -- finished before the wheels touch down: the flight's own bonus
         landedIt = c.live and UnitOnTaxi and UnitOnTaxi("player") and true or false
-        if landedIt then final = max(0, final - 5) end
+        if landedIt then final = Putt.FinalTime(elapsed, adj - 5) end
         -- a route's record counts wherever you play it; only a round in the air can earn the landing bonus
         local e = NS.Route.Note(spec)
         e.par = par
@@ -2130,14 +2213,15 @@ function UI:ShowHelp()
     self.card:Open({
         title = "Gryphon Greens", color = COLORS.green,
         body = table.concat({
-            "|cffffcc40Putt|r: click and drag |cffffcc40back|r from anywhere, like a slingshot. Let go to putt. The further you pull, the harder you hit.",
-            "The dotted line shows where you're aiming and your first bounce. Right-click cancels.",
+            "|cffffcc40Putt|r: click and drag |cffffcc40back|r from anywhere, like a slingshot, and let go. The dotted line shows your aim and first bounce. Right-click cancels.",
             "",
-            "Big hits get shaky: past three quarters power the meter turns |cffffb030amber|r then |cffff5040red|r. The ball must reach the cup gently to drop, so a hole-in-one is a rare feat.",
+            "Past three quarters power the meter turns |cffffb030amber|r then |cffff5040red|r and your aim gets shaky. The ball must reach the cup gently to drop.",
             "",
-            "It's a |cffffcc40time trial|r. The clock runs from your first putt to your last cup. Every stroke under par takes 5s off your time, every stroke over par adds 5s, and a hole-in-one takes off an extra 5s.",
+            "It's a |cffffcc40time trial|r, first putt to last cup. Every stroke under par takes 5s off, every stroke over adds 5s, and a hole-in-one takes off 5s more. Bonuses can take off at most half your time.",
             "",
-            "Water, lava and slime cost a stroke. Portals keep your speed. Bellows give you a push. A ball that stops against a rail is moved a club-head off it, so you always have a real swing.",
+            "|cffffcc40Read the green|r: a shaded dome is a rise, a dish is a hollow, and the chevrons run downhill. Putts break down the slope, more as they slow, and a ball that dies on a steep flank rolls back down.",
+            "",
+            "Water, lava and slime cost a stroke. A ball that stops against a rail is moved a club-head off it.",
             "",
             "|cff9499b3One daily course a day, the same for everyone. Your best time goes on the leaderboard.|r",
         }, "\n"),
@@ -2499,6 +2583,7 @@ function UI:ShowResults(final, elapsed, adj, strokes, par, newBest, landedIt)
             ("Clock %s   Strokes %s%s"):format(Putt.FormatTime(elapsed), Putt.FormatAdj(adj), landedIt and "   |cff3be870Landed it  -5s|r" or ""),
             ("%d strokes  (%s%d vs par %d)"):format(strokes, diff > 0 and "+" or "", diff, par),
         }
+        if final > elapsed + adj - (landedIt and 5 or 0) + 0.05 then lines[#lines + 1] = "|cff9499b3Bonuses can take off at most half your time.|r" end
         if c.live and not landedIt then lines[#lines + 1] = "|cff9499b3Finish before you land for 5 seconds off.|r"
         elseif not c.live then lines[#lines + 1] = "|cff9499b3Play it in the air and finish before you land for 5 seconds off.|r" end
         local rk, n = NS.Social:Rank(NS.Route.Board(spec), "all", "realm")
@@ -2519,6 +2604,7 @@ function UI:ShowResults(final, elapsed, adj, strokes, par, newBest, landedIt)
         ("Clock %s   Strokes %s"):format(Putt.FormatTime(elapsed), Putt.FormatAdj(adj)),
         ("%d strokes  (%s%d vs par %d)"):format(strokes, diff > 0 and "+" or "", diff, par),
     }
+    if final > elapsed + adj + 0.05 then lines[#lines + 1] = "|cff9499b3Bonuses can take off at most half your time.|r" end
     if daily then
         local board = NS.Social:Board("putt", Today())
         for i, e in ipairs(board) do
