@@ -69,7 +69,8 @@ local function NewBall(parent, size, layer, sub)
     b.shadow = disc(sub, 0, 0, 0, 0.35)
     b.base = disc(sub + 1)
     b.m1, b.m2 = disc(sub + 2), disc(sub + 2)
-    b.shine = disc(sub + 3, 1, 1, 1, 0.5)
+    b.shine = parent:CreateTexture(nil, layer, nil, sub + 3)
+    b.shine:SetTexture(W.MEDIA .. "pool\\ball_over")
     if parent.CreateMaskTexture and b.m1.AddMaskTexture then
         b.mask = parent:CreateMaskTexture()
         b.mask:SetTexture(W.MEDIA .. "circle", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
@@ -131,8 +132,8 @@ local function NewBall(parent, size, layer, sub)
         if self.kind == "stripe" then mark(self, self.m2, anchor, x, y, s, -self.px, -self.py, -self.pz, alpha)
         elseif self.kind == "cue" then mark(self, self.m2, anchor, x, y, s, self.qx, self.qy, self.qz, alpha)
         else self.m2:Hide() end
-        self.shine:ClearAllPoints(); self.shine:SetPoint("CENTER", anchor, "TOPLEFT", x - s * 0.2, -(y - s * 0.22)); self.shine:SetSize(s * 0.2, s * 0.2)
-        self.shine:SetAlpha(0.5 * alpha); self.shine:Show()
+        self.shine:ClearAllPoints(); self.shine:SetPoint("CENTER", anchor, "TOPLEFT", x, -y); self.shine:SetSize(s * 1.06, s * 1.06)
+        self.shine:SetAlpha(alpha); self.shine:Show()
     end
     function b:Hide() for _, t in ipairs(self.all) do t:Hide() end end
     -- roll the ball: (ux, uy) is its surface speed over the cloth in screen units, e its side spin
@@ -210,37 +211,52 @@ function UI:Build(parent)
     board:SetSize(FW, FH)
     board:SetFrameLevel(holder:GetFrameLevel() + 2)
     self.board = board
-    local room = W.Solid(board, "BACKGROUND", 0.07, 0.05, 0.045, 1, 0)
-    room:SetAllPoints()
+    local ART = W.MEDIA .. "pool\\"
+    -- the tavern floor, lit by the lamp over the table
+    local room = board:CreateTexture(nil, "BACKGROUND", nil, 0)
+    room:SetTexture(ART .. "floor"); room:SetAllPoints(); room:SetVertexColor(0.50, 0.46, 0.44)
     local lamp = board:CreateTexture(nil, "BACKGROUND", nil, 1)
-    lamp:SetTexture(W.MEDIA .. "glow"); lamp:SetBlendMode("ADD"); lamp:SetVertexColor(1, 0.75, 0.4, 0.16)
+    lamp:SetTexture(W.MEDIA .. "glow"); lamp:SetBlendMode("ADD"); lamp:SetVertexColor(1, 0.75, 0.4, 0.14)
     lamp:SetPoint("CENTER"); lamp:SetSize(FW * 1.6, FH * 1.3)
-    -- rails, cloth, pockets
-    local rail = W.Solid(board, "BACKGROUND", 0.33, 0.18, 0.08, 1, 2)
-    rail:SetPoint("TOPLEFT", board, "TOPLEFT", OX - RAIL, -(OY - RAIL)); rail:SetSize(TW + 2 * RAIL, TH + 2 * RAIL)
-    local lip = W.Solid(board, "BACKGROUND", 0.20, 0.10, 0.04, 1, 3)
-    lip:SetPoint("TOPLEFT", board, "TOPLEFT", OX - 5, -(OY - 5)); lip:SetSize(TW + 10, TH + 10)
-    local cushion = W.Solid(board, "BACKGROUND", FELT[1] * 0.72, FELT[2] * 0.72, FELT[3] * 0.72, 1, 4)
-    cushion:SetPoint("TOPLEFT", board, "TOPLEFT", OX - 3, -(OY - 3)); cushion:SetSize(TW + 6, TH + 6)
-    local cloth = W.Solid(board, "BACKGROUND", FELT[1], FELT[2], FELT[3], 1, 5)
-    cloth:SetPoint("TOPLEFT", board, "TOPLEFT", OX, -OY); cloth:SetSize(TW, TH)
-    local sheen = board:CreateTexture(nil, "BACKGROUND", nil, 6)
-    sheen:SetTexture(W.MEDIA .. "glow"); sheen:SetBlendMode("ADD"); sheen:SetVertexColor(0.5, 1, 0.7, 0.10)
-    sheen:SetPoint("CENTER", board, "TOPLEFT", OX + TW / 2, -(OY + TH / 2)); sheen:SetSize(TW * 1.5, TH * 1.1)
-    for i = 0, 8 do
-        if i ~= 4 then
-            for _, sx in ipairs({ OX - RAIL / 2 - 2, OX + TW + RAIL / 2 + 2 }) do
-                local dmd = board:CreateTexture(nil, "BORDER")
-                dmd:SetTexture(W.MEDIA .. "circle"); dmd:SetVertexColor(0.95, 0.85, 0.6, 0.8); dmd:SetSize(4, 4)
-                dmd:SetPoint("CENTER", board, "TOPLEFT", sx, -(OY + TH * i / 8))
-            end
-        end
+    local under = W.Solid(board, "BACKGROUND", 0, 0, 0, 0.45, 2)      -- the table's shadow on the floor
+    under:SetPoint("TOPLEFT", board, "TOPLEFT", OX - RAIL + 4, -(OY - RAIL + 6)); under:SetSize(TW + 2 * RAIL, TH + 2 * RAIL)
+    -- cushions (a darker strip of cloth) and the cloth itself, laid as two mirrored halves
+    local cushion = W.Solid(board, "BACKGROUND", FELT[1] * 0.6, FELT[2] * 0.6, FELT[3] * 0.6, 1, 3)
+    cushion:SetPoint("TOPLEFT", board, "TOPLEFT", OX - 4, -(OY - 4)); cushion:SetSize(TW + 8, TH + 8)
+    for half = 0, 1 do
+        local cloth = board:CreateTexture(nil, "BACKGROUND", nil, 4)
+        cloth:SetTexture(ART .. "felt")
+        cloth:SetPoint("TOPLEFT", board, "TOPLEFT", OX, -(OY + half * TH / 2)); cloth:SetSize(TW, TH / 2)
+        if half == 1 then cloth:SetTexCoord(0, 1, 1, 0) end
+        cloth:SetVertexColor(0.86, 0.92, 0.88)
     end
+    local sheen = board:CreateTexture(nil, "BACKGROUND", nil, 5)
+    sheen:SetTexture(W.MEDIA .. "glow"); sheen:SetBlendMode("ADD"); sheen:SetVertexColor(1, 0.95, 0.7, 0.10)
+    sheen:SetPoint("CENTER", board, "TOPLEFT", OX + TW / 2, -(OY + TH / 2)); sheen:SetSize(TW * 1.5, TH * 1.1)
+    -- rails: one plank, turned and mirrored so its brass edge always faces the cloth
+    local function rail(file, x, y, w, h, l, r, t, b2)
+        local tx = board:CreateTexture(nil, "BACKGROUND", nil, 6)
+        tx:SetTexture(ART .. file)
+        tx:SetPoint("TOPLEFT", board, "TOPLEFT", x, -y); tx:SetSize(w, h)
+        tx:SetTexCoord(l, r, t, b2)
+    end
+    rail("rail_h", OX - RAIL, OY - RAIL, TW + 2 * RAIL, RAIL, 0, 1, 0, 1)
+    rail("rail_h", OX - RAIL, OY + TH, TW + 2 * RAIL, RAIL, 0, 1, 1, 0)
+    -- (the long rails are laid as two lengths each, mirrored at the middle pocket, so the plank
+    -- keeps its proportions and each half carries its three diamonds)
+    local half = TH / 2 + RAIL
+    rail("rail_v", OX - RAIL, OY - RAIL, RAIL, half, 0, 1, 0, 0.84)
+    rail("rail_v", OX - RAIL, OY - RAIL + half, RAIL, half, 0, 1, 0.84, 0)
+    rail("rail_v", OX + TW, OY - RAIL, RAIL, half, 1, 0, 0, 0.84)
+    rail("rail_v", OX + TW, OY - RAIL + half, RAIL, half, 1, 0, 0.84, 0)
     for _, p in ipairs(Pool.POCKETS) do
         local t = board:CreateTexture(nil, "BORDER", nil, 1)
-        t:SetTexture(W.MEDIA .. "circle"); t:SetVertexColor(0.02, 0.02, 0.02)
-        t:SetSize(27, 27)
-        t:SetPoint("CENTER", board, "TOPLEFT", OX + p.x, -(OY + p.y))
+        t:SetTexture(ART .. "pocket")
+        t:SetSize(46, 46)
+        -- (the leather and brass sit back over the rail; the hole is where the balls drop)
+        local ox = p.x < TW / 2 and -5 or 5
+        local oy = (p.y < 10 and -5) or (p.y > TH - 10 and 5) or 0
+        t:SetPoint("CENTER", board, "TOPLEFT", OX + p.x + ox, -(OY + p.y + oy))
     end
 
     -- the balls, the sight line, the cue
@@ -257,9 +273,10 @@ function UI:Build(parent)
     self.sight, self.objLine, self.cueLine = pill(), pill(), pill()
     self.ghost = board:CreateTexture(nil, "ARTWORK", nil, 3)
     self.ghost:SetTexture(W.MEDIA .. "ring"); self.ghost:SetSize(2 * R * 2.45, 2 * R * 2.45); self.ghost:Hide()      -- (the ring fills about two fifths of its texture)
-    self.stick, self.stickTip = pill("OVERLAY", 1), pill("OVERLAY", 2)
-    self.stick:SetVertexColor(0.80, 0.62, 0.36)
-    self.stickTip:SetVertexColor(0.92, 0.92, 0.95)
+    self.stick = board:CreateTexture(nil, "OVERLAY", nil, 1)
+    self.stick:SetTexture(ART .. "cue")
+    self.stick:Hide()
+    self.stickTip = pill("OVERLAY", 2)       -- (the painted cue has its own tip; this stays hidden)
     -- power
     self.powerBg = W.Solid(board, "ARTWORK", 0, 0, 0, 0.55)
     self.powerBg:SetSize(12, 150)
@@ -277,8 +294,22 @@ function UI:Build(parent)
     for side = 1, 2 do
         local c = {}
         local cx = side == 1 and 37 or FW - 37
+        c.face = board:CreateTexture(nil, "ARTWORK", nil, 0)
+        c.face:SetSize(54, 54)
+        c.face:SetPoint("CENTER", board, "TOPLEFT", cx, -42)
+        c.face:SetTexCoord(0.08, 0.92, 0.04, 0.88)
+        if board.CreateMaskTexture and c.face.AddMaskTexture then
+            local mask = board:CreateMaskTexture()
+            mask:SetTexture(W.MEDIA .. "circle", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+            mask:SetAllPoints(c.face)
+            c.face:AddMaskTexture(mask)
+        end
+        c.ring = board:CreateTexture(nil, "ARTWORK", nil, 1)
+        c.ring:SetTexture(W.TAVERN .. "tav_ring")
+        c.ring:SetSize(66, 66)
+        c.ring:SetPoint("CENTER", c.face, "CENTER")
         c.name = W.Text(board, 11, W.FONT_TITLE)
-        c.name:SetPoint("TOP", board, "TOPLEFT", cx, -14)
+        c.name:SetPoint("TOP", board, "TOPLEFT", cx, -80)
         c.name:SetWidth(70)
         c.sub = W.Text(board, 10, W.FONT)
         c.sub:SetPoint("TOP", c.name, "BOTTOM", 0, -3)
@@ -286,12 +317,12 @@ function UI:Build(parent)
         c.sub:SetTextColor(0.75, 0.78, 0.9)
         c.turn = board:CreateTexture(nil, "BACKGROUND", nil, 2)
         c.turn:SetTexture(W.MEDIA .. "glow"); c.turn:SetBlendMode("ADD"); c.turn:SetVertexColor(1, 0.82, 0.38)
-        c.turn:SetPoint("CENTER", board, "TOPLEFT", cx, -40); c.turn:SetSize(120, 110)
+        c.turn:SetPoint("CENTER", board, "TOPLEFT", cx, -42); c.turn:SetSize(130, 130)
         c.minis = {}
         for i = 1, 15 do c.minis[i] = NewBall(board, 14, "ARTWORK", -4) end
         c.x = cx
         c.big = W.Text(board, 30, FONT_SHOUT, "OUTLINE")
-        c.big:SetPoint("TOP", board, "TOPLEFT", cx, -62)
+        c.big:SetPoint("TOP", board, "TOPLEFT", cx, -118)
         self.cols[side] = c
     end
     -- where the tip strikes the cue ball: drag the dot (right-click puts it back in the middle)
@@ -299,11 +330,9 @@ function UI:Build(parent)
     sp:SetSize(58, 58)
     sp:SetPoint("CENTER", board, "TOPLEFT", 37, -(FH - 76))
     sp:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    sp.ball = sp:CreateTexture(nil, "ARTWORK"); sp.ball:SetTexture(W.MEDIA .. "circle"); sp.ball:SetAllPoints(); sp.ball:SetVertexColor(0.95, 0.94, 0.90)
+    sp.ball = sp:CreateTexture(nil, "ARTWORK"); sp.ball:SetTexture(ART .. "ball"); sp.ball:SetAllPoints()
     sp.h = W.Solid(sp, "OVERLAY", 0, 0, 0, 0.18); sp.h:SetSize(50, 1); sp.h:SetPoint("CENTER")
     sp.v = W.Solid(sp, "OVERLAY", 0, 0, 0, 0.18); sp.v:SetSize(1, 50); sp.v:SetPoint("CENTER")
-    sp.shine = sp:CreateTexture(nil, "OVERLAY"); sp.shine:SetTexture(W.MEDIA .. "circle"); sp.shine:SetVertexColor(1, 1, 1, 0.7)
-    sp.shine:SetSize(10, 10); sp.shine:SetPoint("CENTER", -13, 14)
     sp.dot = sp:CreateTexture(nil, "OVERLAY", nil, 2); sp.dot:SetTexture(W.MEDIA .. "circle"); sp.dot:SetVertexColor(0.9, 0.12, 0.1); sp.dot:SetSize(12, 12)
     sp:SetScript("OnMouseDown", function(_, button) if button == "LeftButton" then self.spinDrag = true end end)
     sp:SetScript("OnMouseUp", function() self.spinDrag = nil end)
@@ -516,8 +545,9 @@ function UI:DrawAim(angle, pull, mine, power, top)
     -- the cue, drawn back by the pull
     local back = R + 4 + pull * 46
     self.stick:SetAlpha(1); self.stickTip:SetAlpha(1)
-    Line(self.stick, self.board, x0 - dx * (back + 8), y0 - dy * (back + 8), x0 - dx * (back + 170), y0 - dy * (back + 170), 4)
-    Line(self.stickTip, self.board, x0 - dx * back, y0 - dy * back, x0 - dx * (back + 9), y0 - dy * (back + 9), 3)
+    -- (the cue is painted tip to the right, eight times as long as its picture is tall)
+    Line(self.stick, self.board, x0 - dx * (back + 200), y0 - dy * (back + 200), x0 - dx * back, y0 - dy * back, 25)
+    self.stickTip:Hide()
 end
 
 function UI:HideAim()
@@ -878,7 +908,19 @@ function UI:OnUpdate(el)
     if self.hudT <= 0 then self.hudT = 0.25; self:RefreshHUD() end
 end
 
-function UI:FillColumn(c, title, sub, ids, lit)
+-- face: "player" for your own portrait, a regular's key for theirs, nil for none
+function UI:FillColumn(c, title, sub, ids, lit, face)
+    if c.shown ~= (face or false) then
+        c.shown = face or false
+        local ok = false
+        if face == "player" then
+            if SetPortraitTexture then ok = pcall(SetPortraitTexture, c.face, "player"); c.face:SetTexCoord(0, 1, 0, 1) end
+        elseif face then
+            c.face:SetTexture(W.MEDIA .. "pool\\foe_" .. face); c.face:SetTexCoord(0.08, 0.92, 0.04, 0.88)
+            ok = true
+        end
+        c.face:SetShown(ok); c.ring:SetShown(ok)
+    end
     c.name:SetText(title or "")
     c.sub:SetText(sub or "")
     c.turn:SetAlpha(lit and (0.22 + 0.08 * sin((self.rt or 0) * 4)) or 0)
@@ -887,7 +929,7 @@ function UI:FillColumn(c, title, sub, ids, lit)
         local id = ids and ids[i]
         if id then
             m:Set(id)
-            m:Put(self.board, c.x - 9 + ((i - 1) % 2) * 18, 104 + floor((i - 1) / 2) * 18)
+            m:Put(self.board, c.x - 9 + ((i - 1) % 2) * 18, 130 + floor((i - 1) / 2) * 18)
         else
             m:Hide()
         end
@@ -924,9 +966,9 @@ function UI:RefreshHUD()
             return ids, kind == "solid" and "Solids" or "Stripes"
         end
         local ids, sub = todo("you")
-        self:FillColumn(left, "YOU", sub, ids, g.turn == "you" and g.phase ~= "over")
+        self:FillColumn(left, "YOU", sub, ids, g.turn == "you" and g.phase ~= "over", "player")
         ids, sub = todo("foe")
-        self:FillColumn(right, foe.name:gsub("^The ", ""):upper(), sub, ids, g.turn == "foe" and g.phase ~= "over")
+        self:FillColumn(right, foe.name:gsub("^The ", ""):upper(), sub, ids, g.turn == "foe" and g.phase ~= "over", foe.key)
     else
         local daily = g.mode == "daily"
         self.modeText:SetText(daily and "DAILY TABLE" or "SOLO TABLE")
@@ -935,7 +977,7 @@ function UI:RefreshHUD()
         self.rightLabel:SetText(daily and "TODAY'S BEST" or "BEST")
         local best = daily and (self:Daily().best or 0) or self.db.bestSolo
         self.rightValue:SetText(best > 0 and tostring(best) or "-")
-        self:FillColumn(left, "SHOTS", g.fouls > 0 and ("%d from fouls"):format(g.fouls) or "", nil, false)
+        self:FillColumn(left, "SHOTS", g.fouls > 0 and ("%d from fouls"):format(g.fouls) or "", nil, false, "player")
         left.big:SetText(tostring(g:Score()))
         local ids = {}
         for _, b in ipairs(g.balls) do if b.on and b.id ~= 0 then ids[#ids + 1] = b.id end end
@@ -1048,7 +1090,7 @@ function UI:ShowMenu()
         buttons[#buttons] = { d.run and "Continue daily" or "Daily Table", function() self:Begin("daily") end }
     end
     self.menu:Open({
-        title = "Tavern Pool", sub = "Eight-ball against the regulars", icon = W.MEDIA .. "ball_bomb",
+        title = "Tavern Pool", sub = "Eight-ball against the regulars", icon = W.TAVERN .. "tok_pool",
         color = TINT, lines = lines, buttons = buttons, options = NS.CommonOptions(),
     })
 end

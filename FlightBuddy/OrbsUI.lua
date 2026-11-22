@@ -914,7 +914,7 @@ function UI:ShowMenu()
     end
     buttons[#buttons + 1] = { "Leaderboards", function() self:ShowBoard() end }
     self.menu:Open({
-        title = "Orb Cannon", sub = "Fire, match three, bring them down", icon = W.MEDIA .. "ball_arcane",
+        title = "Orb Cannon", sub = "Fire, match three, bring them down", icon = W.TAVERN .. "tok_orbs",
         color = TINT, lines = lines, buttons = buttons, options = NS.CommonOptions(),
     })
 end

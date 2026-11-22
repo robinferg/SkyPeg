@@ -38,12 +38,11 @@ UI.GAMES = {
       art = "key_greens", mx = 0.5, my = 0.40, tx = 0.60, ty = 0.36, tz = 0.56, board = "putt", daily = true },
     { key = "gem",  name = "Jewelcrafter's Bench", plate = "Jewelcrafter", tag = "Cut gems three in a row.",
       art = "key_gems", mx = 0.5, my = 0.50, tx = 0.40, ty = 0.50, tz = 0.56, board = "gemd", daily = true },
-    -- (Orb Cannon and Tavern Pool borrow Rune Breaker backdrops until their own key art is painted: `file` is a
-    -- whole texture path used instead of tavern\\<art>)
+    -- (a game with no key art yet can give `file = <whole texture path>` instead of `art`)
     { key = "orbs", name = "Orb Cannon", tag = "Fire, match three, bring them down.",
-      file = W.MEDIA .. "pbg_frost_peaks", mx = 0.5, my = 0.45, tx = 0.50, ty = 0.45, tz = 0.70, board = "obd", daily = true },
+      art = "key_orbs", mx = 0.5, my = 0.42, tx = 0.50, ty = 0.60, tz = 0.62, board = "obd", daily = true },
     { key = "pool", name = "Tavern Pool", tag = "Eight-ball against the regulars.",
-      file = W.MEDIA .. "pbg_forge_hall", mx = 0.5, my = 0.5, tx = 0.50, ty = 0.50, tz = 0.70, board = "pld", daily = true },
+      art = "key_pool", mx = 0.5, my = 0.55, tx = 0.50, ty = 0.56, tz = 0.60, board = "pld", daily = true },
     { key = "roll", name = "Death Roll", tag = "Wager gold on the roll of the dice.",
       art = "key_roll", mx = 0.5, my = 0.60, tx = 0.60, ty = 0.60, tz = 0.60 },
     { key = "flap", name = "Featherbeard", tag = "Fly a gryphon through Dun Morogh.",
