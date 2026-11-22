@@ -33,7 +33,20 @@ local function Key(name) name = Norm(name); return name and name:lower() end
 local function MeName() return Norm((UnitName and UnitName("player")) or "Player") end
 local function Me() return Key(MeName()) end
 local function MyClass() local _, c = UnitClass("player"); return c or "WARRIOR" end
+local function Version()
+    local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+    local ok, v = pcall(function() return get and get("FlightBuddy", "Version") end)
+    return (ok and type(v) == "string" and v ~= "") and v or "?"
+end
 D.Short, D.Key = Short, Key
+-- A player's name without the realm, lower case. The server does not always write a realm the way
+-- this client does, and may write it differently from one message to the next (see Social.lua), so
+-- inside a game the two players are told apart by this and by the game's number, never by realm.
+local function Bare(name)
+    if type(name) ~= "string" or name == "" then return nil end
+    return (name:match("^(.+)%-[^%-]+$") or name):lower()
+end
+local function Same(a, b) return a ~= nil and b ~= nil and (Key(a) == Key(b) or Bare(a) == Bare(b)) end
 
 function D.Money(copper)
     copper = floor(max(0, copper or 0) + 0.5)
@@ -47,8 +60,39 @@ end
 ---------------------------------------------------------------------------
 -- Wire
 ---------------------------------------------------------------------------
+-- the last few messages in and out, for /deathroll debug
+local wireLog = {}
+local function Log(dir, chan, who, text)
+    wireLog[#wireLog + 1] = ("%s %s %s %s: %s"):format(date and date("%H:%M:%S") or "", dir, chan or "?", tostring(who or "-"), tostring(text):sub(1, 60))
+    if #wireLog > 24 then table.remove(wireLog, 1) end
+end
 local function Raw(text, chatType, target) queue[#queue + 1] = { text, chatType, target } end
 local function Whisper(name, ...) Raw(table.concat({ ... }, ","), "WHISPER", Short(name)) end
+-- Every way a player might be reached, each once: as we would normally whisper them, and by bare
+-- name when that carries a realm (a spelling of our own realm we have not learned yet cannot be
+-- whispered, but the bare name can).
+local function Addresses(names)
+    local list, seen = {}, {}
+    local function add(t)
+        if type(t) ~= "string" or t == "" or NS.Social.IsMe(t) then return end
+        t = Short(t)
+        if not seen[t:lower()] then seen[t:lower()] = true; list[#list + 1] = t end
+    end
+    for i = 1, 4 do
+        local name = names[i]
+        if type(name) == "string" and name ~= "" then
+            add(name)
+            add(name:match("^(.+)%-[^%-]+$"))
+        end
+    end
+    return list
+end
+-- an answer to somebody: it goes to every spelling of them we have (the game on the other side takes
+-- the same news twice without harm)
+local function Reply(names, ...)
+    local text = table.concat({ ... }, ",")
+    for _, t in ipairs(Addresses(names)) do Raw(text, "WHISPER", t) end
+end
 -- everyone who might want to watch: the guild and whatever group I'm in
 local function Broadcast(...)
     local text = table.concat({ ... }, ",")
@@ -166,7 +210,15 @@ end
 local function LookFields(l) return l.race, l.sex, table.concat(l.items, ".") end
 local function SendLook(to, id) Whisper(to, "L", id, LookFields(D.MyLook())) end
 
-function D:Look(key) return key and self.db.looks and self.db.looks[key] or nil end
+function D:Look(key)
+    local looks = key and self.db.looks
+    if not looks then return nil end
+    if looks[key] then return looks[key] end
+    -- the same player kept under another spelling of the realm
+    local b = Bare(key)
+    for k, l in pairs(looks) do if Bare(k) == b then return l end end
+    return nil
+end
 
 function D:StoreLook(skey, name, race, sex, itemText)
     race, sex = tonumber(race), tonumber(sex)
@@ -204,6 +256,31 @@ end
 
 local function Other(g, key) return key == g.a and g.b or g.a end
 D.Other = Other
+
+-- tell my opponent something about our game
+local function Tell(g, ...)
+    local opp = Other(g, Me())
+    Reply({ g.to, g.name[opp], g.wire and g.wire[opp] }, ...)
+end
+
+-- Which of my game's two players sent this? Their exact name, a spelling of them seen before, the
+-- same name under another spelling of the realm, or (while my challenge is waiting for its answer)
+-- whoever answers it: only the player I whispered knows the game's number.
+local function From(g, skey, sender, cmd)
+    if skey == g.a or skey == g.b then return skey end
+    local k = g.alias and g.alias[skey]
+    if k then return k end
+    local me = Me()
+    if g.a ~= me and g.b ~= me then return nil end
+    local opp = Other(g, me)
+    local answer = g.state == "pending" and g.a == me and (cmd == "A" or cmd == "D")
+    if Bare(sender) == Bare(g.name[opp]) or answer then
+        g.alias = g.alias or {}
+        g.alias[skey] = opp
+        return opp
+    end
+    return nil
+end
 
 function D:Mine() return self.game end
 function D:Busy() local g = self.game; return g and (g.state == "pending" or g.state == "play") end
@@ -313,6 +390,7 @@ function D:Challenge(name, wagerCopper, start)
     local me = MeName()
     local g = NewGame(Short(me):gsub("[,;%s]", ""):sub(1, 12) .. ":" .. (time() % 100000), me, name, MyClass(), "WARRIOR", wagerCopper, start)
     g.state, g.sentAt = "pending", GetTime()
+    g.to = name       -- the name the challenge went to: whatever else, that one reaches them
     self.game = g
     self.db.start, self.db.lastWager = start, wagerCopper
     Whisper(name, "C", g.id, wagerCopper, start, MyClass())
@@ -332,15 +410,19 @@ function D:Accept()
     if not inv then return end
     self.invite = nil
     if GetMoney and GetMoney() < inv.wager then
-        Whisper(inv.from, "D", inv.id, "poor")
+        Reply({ inv.from, inv.raw }, "D", inv.id, "poor")
         NS.Print("You don't have " .. D.Money(inv.wager) .. " to wager.")
         return
     end
     local g = NewGame(inv.id, inv.from, MeName(), inv.class, MyClass(), inv.wager, inv.start)
+    g.wire = { [g.a] = inv.raw }
     self.game = g
-    Whisper(inv.from, "A", inv.id, MyClass())
+    -- "I accept": whispered to every spelling of the challenger, and said on the guild and group
+    -- channels too, so one lost whisper cannot leave them waiting
+    Tell(g, "A", inv.id, MyClass(), Version())
+    Broadcast("A", inv.id, MyClass(), Version())
     g.ackWait = { n = 0, at = GetTime() }   -- said again (see Pump) until the challenger's game says it heard
-    SendLook(inv.from, inv.id)
+    Tell(g, "L", inv.id, LookFields(D.MyLook()))
     Broadcast("L", inv.id, LookFields(D.MyLook()))
     if self.onOpen then self.onOpen() end
     self:Changed()
@@ -350,7 +432,7 @@ function D:Decline(reason)
     local inv = self.invite
     if not inv then return end
     self.invite = nil
-    Whisper(inv.from, "D", inv.id, reason or "no")
+    Reply({ inv.from, inv.raw }, "D", inv.id, reason or "no")
 end
 
 -- throw the dice: the real /roll, so the server picks the number
@@ -382,7 +464,7 @@ function D:TakeRoll(who, roll, maxv, verified)
     local e = Apply(g, who, roll, verified)
     local me = Me()
     if who == me then
-        Whisper(g.name[Other(g, me)], "R", g.id, e.seq, roll, maxv)
+        Tell(g, "R", g.id, e.seq, roll, maxv)
         self:Announce(e)
     end
     if g.state == "over" then self:Record(g, e) end
@@ -398,7 +480,7 @@ function D:OfferDouble()
     if not (g and g.state == "over" and g.owed and g.owed.amount > 0 and g.owed.from == me and not g.offer) then return false, "Nothing to double" end
     if GetMoney and GetMoney() < g.owed.amount * 2 then return false, "You can't cover double" end
     g.offer = { from = me, at = GetTime() }
-    Whisper(g.name[Other(g, me)], "O", g.id)
+    Tell(g, "O", g.id)
     self:Changed()
     return true
 end
@@ -418,13 +500,13 @@ function D:AnswerDouble(yes)
     if not (g and g.state == "over" and g.offer and g.offer.from ~= me) then return end
     local opp = Other(g, me)
     if yes then
-        Whisper(g.name[opp], "Y", g.id)
+        Tell(g, "Y", g.id)
         BeginDouble(self, g)
         if self.onOpen then self.onOpen() end
         if self.onRound then self.onRound(g) end
     else
         g.offer = nil
-        Whisper(g.name[opp], "N", g.id)
+        Tell(g, "N", g.id)
     end
     self:Changed()
 end
@@ -435,10 +517,10 @@ function D:Forfeit()
     local me = Me()
     if not g then return end
     if g.state == "pending" then
-        Whisper(g.name[g.b], "X", g.id)
+        Tell(g, "X", g.id)
         self.game = nil
     elseif g.state == "play" then
-        Whisper(g.name[Other(g, me)], "F", g.id)
+        Tell(g, "F", g.id)
         Broadcast("E", g.id, Short(g.name[me]))
         self:Concede(g, me)
     end
@@ -534,30 +616,39 @@ local function cls(s) return CLASSES[s or ""] and s or "WARRIOR" end
 
 function D:OnMessage(prefix, text, channel, sender)
     if prefix ~= PREFIX or type(text) ~= "string" then return end
+    local raw = sender       -- exactly as the server wrote them
     sender = Norm(sender)
     if not sender then return end
     local skey = Key(sender)
     local me = Me()
     if skey == me then return end
+    Log("in ", channel, raw, text)
     local a = { strsplit(",", text) }
     local cmd, id = a[1], a[2]
     if not cmd or not id then return end
+    local g = self.game
 
     -- what the sender's character looks like: from my opponent, from whoever is challenging me, or
     -- (on the guild or group channel) from the players of a death roll I can watch
     if cmd == "L" then
-        local g = self.game
-        local known = (g and (skey == g.a or skey == g.b)) or (self.invite and Key(self.invite.from) == skey)
+        local mine = g and g.id == id and From(g, skey, sender, cmd)
+        local known = mine or (g and (skey == g.a or skey == g.b)) or (self.invite and Same(self.invite.from, sender))
         if not known and channel ~= "WHISPER" then
             for _, w in pairs(self.watch) do if skey == w.a or skey == w.b then known = true end end
         end
-        if known or self:Trusted(sender) then self:StoreLook(skey, sender, a[3], a[4], a[5]) end
+        -- (my opponent's look is kept under the name my game knows them by)
+        if known or self:Trusted(sender) then self:StoreLook(mine or skey, sender, a[3], a[4], a[5]) end
         return
     end
 
-    if channel ~= "WHISPER" then return self:OnWatch(cmd, id, a, sender, skey) end
+    if channel ~= "WHISPER" then
+        -- News of my own game heard on the guild or group channel is the same news as the whisper,
+        -- in case that was lost: "I accept" and each roll. Anything else there is somebody else's game.
+        if not (g and g.id == id) then return self:OnWatch(cmd, id, a, sender, skey) end
+        if cmd == "R" then a = { "R", id, a[3], a[5], a[6] }      -- (said aloud, a roll names its roller)
+        elseif cmd ~= "A" then return end
+    end
 
-    local g = self.game
     if cmd == "C" then
         local wager, start = num(a[3], 0, 1e11), num(a[4], 2, 1000000)
         if not wager or not start then return end
@@ -567,11 +658,11 @@ function D:OnMessage(prefix, text, channel, sender)
                 self.blocked[skey] = GetTime()
                 NS.Print(("%s tried to challenge you to a Death Roll. Group up or add them as a friend to play."):format(Short(sender)))
             end
-            return Whisper(sender, "D", id, "private")
+            return Reply({ sender, raw }, "D", id, "private")
         end
-        if self:Busy() then return Whisper(sender, "D", id, "busy") end
-        if self.invite and Key(self.invite.from) ~= skey then Whisper(self.invite.from, "D", self.invite.id, "busy") end
-        self.invite = { id = id, from = sender, wager = wager, start = start, class = cls(a[5]), at = GetTime() }
+        if self:Busy() then return Reply({ sender, raw }, "D", id, "busy") end
+        if self.invite and not Same(self.invite.from, sender) then Reply({ self.invite.from, self.invite.raw }, "D", self.invite.id, "busy") end
+        self.invite = { id = id, from = sender, raw = raw, wager = wager, start = start, class = cls(a[5]), at = GetTime() }
         local detail = (wager > 0 and ("Wager: " .. D.Money(wager)) or "No wager, just for glory") .. ("\nRolling from %s"):format(NS.W.Commas(start))
         if self.onInvite then self.onInvite(self.invite) end
         if StaticPopup_Show then StaticPopup_Show("FLIGHTBUDDY_DR_INVITE", Short(sender), detail)
@@ -579,19 +670,24 @@ function D:OnMessage(prefix, text, channel, sender)
         return
     end
     if cmd == "X" then
-        if self.invite and self.invite.id == id and Key(self.invite.from) == skey then
+        if self.invite and self.invite.id == id and Same(self.invite.from, sender) then
             self.invite = nil
             if StaticPopup_Hide then StaticPopup_Hide("FLIGHTBUDDY_DR_INVITE") end
         end
         return
     end
-    if not g or g.id ~= id or (skey ~= g.a and skey ~= g.b) then return end
-    g.name[skey] = sender
+    if not g or g.id ~= id then return end
+    local from = From(g, skey, sender, cmd)
+    if not from or from == me then return end
+    skey = from
+    g.name[from] = sender       -- as the server writes them
+    g.wire = g.wire or {}
+    g.wire[from] = raw
     g.ackWait = nil   -- anything from my opponent about this game means theirs is running
     if cmd == "K" then return end
 
     if cmd == "A" then
-        if skey == g.b then Whisper(sender, "K", id) end   -- heard you (an accept said twice is answered twice)
+        if skey == g.b then Tell(g, "K", id) end   -- heard you (an accept said twice is answered twice)
         if g.state == "pending" and skey == g.b then
             g.class[g.b] = cls(a[3])
             g.state, g.began, g.last = "play", GetTime(), GetTime()
@@ -728,6 +824,7 @@ function D:Pump(el)
     if sendAcc >= 0.12 and #queue > 0 then
         sendAcc = 0
         local q = table.remove(queue, 1)
+        Log("out", q[2], q[3], q[1])
         NS.Social.Deliver(PREFIX, q[1], q[2], q[3])
     end
     local now = GetTime()
@@ -738,12 +835,17 @@ function D:Pump(el)
         -- my accept has not been acknowledged: say it again, three times at most
         if g.ackWait.n < 3 and g.state == "play" and g.seq == 0 then
             g.ackWait.n, g.ackWait.at = g.ackWait.n + 1, now
-            Whisper(g.name[g.a], "A", g.id, MyClass())
+            Tell(g, "A", g.id, MyClass(), Version())
+            Broadcast("A", g.id, MyClass(), Version())
         else
             g.ackWait = nil
         end
     end
     if g then
+        if g.state == "pending" and not g.nudged and now - g.sentAt > 20 then
+            g.nudged = true
+            NS.Print(("No answer from %s yet. If they have already accepted on their screen, their Flight Buddy is older than yours and its answer is not getting through: they need the same version you have."):format(Short(g.name[g.b])))
+        end
         if g.state == "pending" and now - g.sentAt > INVITE_SECS then
             self.game = nil
             NS.Print(("%s didn't answer your Death Roll."):format(Short(g.name[g.b])))
@@ -755,6 +857,21 @@ function D:Pump(el)
     end
 end
 
+-- /deathroll debug: what this game knows and the last messages in and out, to copy into a bug report
+function D:Debug()
+    local S = NS.Social
+    NS.Print(("Death Roll debug. Flight Buddy %s. I am \"%s\"; the client calls my realm \"%s\"; the server has written it: %s"):format(
+        Version(), tostring(UnitName and UnitName("player")), MyRealm(), (S.RealmSpellings and S.RealmSpellings()) or "?"))
+    local g = self.game
+    if g then
+        NS.Print(("  game %s: %s, %s (a) against %s (b), sent to \"%s\""):format(g.id, g.state, tostring(g.name[g.a]), tostring(g.name[g.b]), tostring(g.to or "-")))
+    else
+        NS.Print("  no game" .. (self.invite and (", an invitation from " .. tostring(self.invite.raw)) or ""))
+    end
+    if #wireLog == 0 then NS.Print("  no Death Roll messages yet this session") end
+    for _, l in ipairs(wireLog) do NS.Print("  " .. l) end
+end
+
 -- /deathroll Name 50 (gold), /deathroll accept, /deathroll
 function D:Slash(msg)
     local cmd, rest = (msg or ""):match("^%s*(%S*)%s*(.-)%s*$")
@@ -762,6 +879,7 @@ function D:Slash(msg)
     if lc == "accept" then self:Accept(); return end
     if lc == "decline" then self:Decline(); return end
     if lc == "look" then if self.onLookTest then self.onLookTest() end; return end
+    if lc == "debug" then return self:Debug() end
     if lc ~= "" then
         -- "Name [gold]" or "First Last [gold]"
         local whole = (msg or ""):match("^%s*(.-)%s*$")

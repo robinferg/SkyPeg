@@ -135,6 +135,14 @@ end
 
 function Social.IsMe(name) return type(name) == "string" and Full(name) == Social.Me() end
 
+-- every spelling of our realm seen on the wire so far (for bug reports)
+function Social.RealmSpellings()
+    local t = {}
+    for r in pairs(ourRealms) do t[#t + 1] = r end
+    table.sort(t)
+    return #t > 0 and table.concat(t, ", ") or "nothing yet"
+end
+
 -- Another spelling of our own realm. Stored results heard under it are re-keyed on the next pump.
 function Social.LearnRealm(r)
     if type(r) ~= "string" or r == "" or OurRealm(r) then return end
