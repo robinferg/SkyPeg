@@ -15,13 +15,16 @@ local floor, min, max, abs, sin, cos, pi, sqrt = math.floor, math.min, math.max,
 local atan2 = math.atan2 or function(y, x) return math.atan(y, x) end
 
 Pool.TW, Pool.TH, Pool.R = 244, 488, 8
-Pool.MIN_V, Pool.MAX_V = 70, 1000           -- cue ball speed at no power and at full power
-Pool.BREAK_BOOST = 1.6
+Pool.MIN_V, Pool.MAX_V = 70, 1100           -- cue ball speed at no power and at full power
+Pool.BREAK_BOOST = 2.0
 Pool.FOUL_COST = 1                          -- shots added for a foul when playing alone
 local TW, TH, R = Pool.TW, Pool.TH, Pool.R
 local DT = 1 / 240
-local DECEL, DRAG = 62, 0.09                -- rolling friction, and a little that grows with speed
-local REST_BALL, REST_RAIL, REST_JAW = 0.95, 0.74, 0.6
+local SLIDE = 380                           -- friction on a ball that is skidding rather than rolling
+local SPIN_TOP = 1.25                       -- a tip right at the top of the ball sets it spinning this much faster than it travels
+local SIDE_GRIP = 0.30                      -- how much of the side spin a cushion turns into sideways speed
+local DECEL, DRAG = 45, 0.06                -- rolling friction, and a little that grows with speed
+local REST_BALL, REST_RAIL, REST_JAW = 0.95, 0.88, 0.6
 local CG, SG = 17, 14                       -- how far a corner / side pocket's mouth runs along the rail
 local HEAD_Y, FOOT_Y = TH * 0.76, TH * 0.27 -- where the cue ball starts, and the top ball of the rack
 
@@ -47,7 +50,7 @@ function Pool.Color(id) return Pool.COLORS[id > 8 and id - 8 or id] end
 function Pool.Kind(id) return id == 0 and "cue" or (id == 8 and "eight") or (id < 8 and "solid" or "stripe") end
 
 Pool.FOES = {
-    { key = "barkeep", name = "The Barkeep", blurb = "Plays between pouring drinks.", err = 0.060, look = 1 },
+    { key = "barkeep", name = "The Barkeep", blurb = "Plays between pouring drinks.", err = 0.045, look = 1 },
     { key = "brawler", name = "The Brawler", blurb = "Hits hard, thinks later.",     err = 0.026, look = 2 },
     { key = "hustler", name = "The Hustler", blurb = "Has been waiting for you.",    err = 0.008, look = 4 },
 }
@@ -74,7 +77,9 @@ end
 ---------------------------------------------------------------------------
 -- Setting the table
 ---------------------------------------------------------------------------
-local function Ball(id, x, y) return { id = id, x = x, y = y, vx = 0, vy = 0, on = true } end
+-- (ux, uy is the speed the ball's SPIN would carry it at: equal to vx, vy when it rolls true,
+-- ahead of it with follow, against it with draw; e is side spin)
+local function Ball(id, x, y) return { id = id, x = x, y = y, vx = 0, vy = 0, ux = 0, uy = 0, e = 0, on = true } end
 
 function Pool:Free(x, y, skip, gap)
     if x < R or x > TW - R or y < R or y > TH - R then return false end
@@ -173,20 +178,37 @@ local function InMouth(x, y)
 end
 
 function Pool:Moving()
-    for _, b in ipairs(self.balls) do if b.on and (b.vx ~= 0 or b.vy ~= 0) then return true end end
+    for _, b in ipairs(self.balls) do if b.on and (b.vx ~= 0 or b.vy ~= 0 or b.ux ~= 0 or b.uy ~= 0) then return true end end
     return false
 end
 
+local H = DT        -- the slice of time being stepped (halved while anything is moving very fast)
 local function Substep(self, ev)
     local balls = self.balls
     for _, b in ipairs(balls) do
-        if b.on and (b.vx ~= 0 or b.vy ~= 0) then
-            local s = sqrt(b.vx * b.vx + b.vy * b.vy)
-            local s2 = s - (DECEL + DRAG * s) * DT
-            if s2 < 3 then b.vx, b.vy = 0, 0
+        if b.on and (b.vx ~= 0 or b.vy ~= 0 or b.ux ~= 0 or b.uy ~= 0) then
+            -- the cloth grips the bottom of the ball: while the ball skids (its spin and its travel
+            -- disagree) friction pulls the two together, which is what makes follow run on, draw
+            -- come back, and a struck ball lose pace before it settles into a roll
+            local sx, sy = b.vx - b.ux, b.vy - b.uy
+            local slip = sqrt(sx * sx + sy * sy)
+            local k = SLIDE * H
+            if slip > 3.5 * k then
+                local nx, ny = sx / slip, sy / slip
+                b.vx, b.vy = b.vx - nx * k, b.vy - ny * k
+                b.ux, b.uy = b.ux + nx * k * 2.5, b.uy + ny * k * 2.5
             else
-                b.vx, b.vy = b.vx * s2 / s, b.vy * s2 / s
-                b.x, b.y = b.x + b.vx * DT, b.y + b.vy * DT
+                if slip > 0 then b.vx, b.vy = b.vx - sx * (2 / 7), b.vy - sy * (2 / 7) end
+                -- rolling true: only the cloth's drag now
+                local sp = sqrt(b.vx * b.vx + b.vy * b.vy)
+                local sp2 = sp - (DECEL + DRAG * sp) * H
+                if sp2 < 3 then b.vx, b.vy = 0, 0 else b.vx, b.vy = b.vx * sp2 / sp, b.vy * sp2 / sp end
+                b.ux, b.uy = b.vx, b.vy
+            end
+            b.x, b.y = b.x + b.vx * H, b.y + b.vy * H
+            if b.e ~= 0 then
+                b.e = b.e * (1 - 0.35 * H)
+                if (b.vx == 0 and b.vy == 0) or abs(b.e) < 2 then b.e = 0 end
             end
         end
     end
@@ -197,10 +219,10 @@ local function Substep(self, ev)
         for i = 1, n - 1 do
             local a = balls[i]
             if a.on then
-                local am = a.vx ~= 0 or a.vy ~= 0
+                local am = a.vx ~= 0 or a.vy ~= 0 or a.ux ~= 0 or a.uy ~= 0
                 for j = i + 1, n do
                     local b = balls[j]
-                    if b.on and (am or b.vx ~= 0 or b.vy ~= 0) then
+                    if b.on and (am or b.vx ~= 0 or b.vy ~= 0 or b.ux ~= 0 or b.uy ~= 0) then
                         local dx, dy = b.x - a.x, b.y - a.y
                         local d2 = dx * dx + dy * dy
                         if d2 < 4 * R * R and d2 > 0 then
@@ -243,7 +265,7 @@ local function Substep(self, ev)
                 end
             end
             if gone then
-                b.on, b.vx, b.vy = false, 0, 0
+                b.on, b.vx, b.vy, b.ux, b.uy, b.e = false, 0, 0, 0, 0, 0
                 self.potted[#self.potted + 1] = b.id
                 ev.pots[#ev.pots + 1] = { id = b.id, pocket = gone, x = b.x, y = b.y }
             else
@@ -256,6 +278,7 @@ local function Substep(self, ev)
                         local vn = b.vx * nx + b.vy * ny
                         if vn < 0 then
                             b.vx, b.vy = b.vx - (1 + REST_JAW) * vn * nx, b.vy - (1 + REST_JAW) * vn * ny
+                            b.ux, b.uy = b.vx * 0.5, b.vy * 0.5
                             if -vn > ev.rail then ev.rail = -vn end
                         end
                         b.x, b.y = j[1] + nx * R, j[2] + ny * R
@@ -270,12 +293,30 @@ local function Substep(self, ev)
                         if not best or d < best then best, px, py = d, p.x, p.y end
                     end
                     local d = sqrt(best)
-                    if d > 0 then b.vx, b.vy = b.vx + (px - b.x) / d * 900 * DT, b.vy + (py - b.y) / d * 900 * DT end
+                    if d > 0 then b.vx, b.vy = b.vx + (px - b.x) / d * 900 * H, b.vy + (py - b.y) / d * 900 * H end
                 else
-                    if b.x < R then b.x = R; if b.vx < 0 then if -b.vx > ev.rail then ev.rail = -b.vx end; b.vx = -b.vx * REST_RAIL; self.railed = true end
-                    elseif b.x > TW - R then b.x = TW - R; if b.vx > 0 then if b.vx > ev.rail then ev.rail = b.vx end; b.vx = -b.vx * REST_RAIL; self.railed = true end end
-                    if b.y < R then b.y = R; if b.vy < 0 then if -b.vy > ev.rail then ev.rail = -b.vy end; b.vy = -b.vy * REST_RAIL; self.railed = true end
-                    elseif b.y > TH - R then b.y = TH - R; if b.vy > 0 then if b.vy > ev.rail then ev.rail = b.vy end; b.vy = -b.vy * REST_RAIL; self.railed = true end end
+                    -- a cushion: the ball comes off it skidding (its roll into the rail is spent), and
+                    -- side spin bites: seen from above, right-hand spin throws the ball to its right
+                    local nx, ny
+                    if b.x < R then b.x = R; if b.vx < 0 then nx, ny = 1, 0 end
+                    elseif b.x > TW - R then b.x = TW - R; if b.vx > 0 then nx, ny = -1, 0 end end
+                    if nx then
+                        if abs(b.vx) > ev.rail then ev.rail = abs(b.vx) end
+                        b.vx, b.ux = -b.vx * REST_RAIL, 0
+                        b.vy = b.vy - nx * b.e * SIDE_GRIP
+                        b.e = b.e * 0.45
+                        self.railed = true
+                    end
+                    nx = nil
+                    if b.y < R then b.y = R; if b.vy < 0 then ny = 1; nx = 0 end
+                    elseif b.y > TH - R then b.y = TH - R; if b.vy > 0 then ny = -1; nx = 0 end end
+                    if nx then
+                        if abs(b.vy) > ev.rail then ev.rail = abs(b.vy) end
+                        b.vy, b.uy = -b.vy * REST_RAIL, 0
+                        b.vx = b.vx + ny * b.e * SIDE_GRIP
+                        b.e = b.e * 0.45
+                        self.railed = true
+                    end
                 end
             end
         end
@@ -283,15 +324,20 @@ local function Substep(self, ev)
 end
 
 -- Strike the cue ball: angle in radians (0 = right, pi/2 = UP the screen), power 0..1.
-function Pool:Shoot(angle, power)
+-- Where the tip meets the ball: top from -1 (low: draw, the ball comes back) to 1 (high: follow,
+-- it runs on), side from -1 (left) to 1 (right). Dead centre is 0, 0: the ball skids, then rolls.
+function Pool:Shoot(angle, power, top, side)
     if self.phase ~= "aim" then return false end
     power = max(0, min(1, power or 0.5))
+    top, side = max(-1, min(1, top or 0)), max(-1, min(1, side or 0))
     -- the table as it stood, with the shot on top: enough to play it again after a reload
-    self.pending = { angle = angle, power = power, before = self:Snapshot() }
+    self.pending = { angle = angle, power = power, top = top, side = side, before = self:Snapshot() }
     local c = self:Cue()
     local v = Pool.MIN_V + (Pool.MAX_V - Pool.MIN_V) * power
     if self.breakShot then v = v * Pool.BREAK_BOOST end      -- the break is struck with the whole arm
     c.vx, c.vy = cos(angle) * v, -sin(angle) * v
+    c.ux, c.uy = c.vx * SPIN_TOP * top, c.vy * SPIN_TOP * top
+    c.e = v * side
     self.firstHit, self.potted, self.railed = nil, {}, false
     self.acc, self.clock = 0, 0
     self.inHand = false
@@ -309,9 +355,20 @@ function Pool:Step(dt)
     while self.acc >= DT do
         self.acc = self.acc - DT
         self.clock = self.clock + DT
-        Substep(self, ev)
+        -- anything really flying (the break) is stepped in half slices so it cannot skip past a ball
+        local fast = false
+        for _, b in ipairs(self.balls) do
+            if b.on and b.vx * b.vx + b.vy * b.vy > 1000 * 1000 then fast = true; break end
+        end
+        if fast then
+            H = DT / 2
+            Substep(self, ev); Substep(self, ev)
+            H = DT
+        else
+            Substep(self, ev)
+        end
         if not self:Moving() or self.clock > 25 then
-            for _, b in ipairs(self.balls) do b.vx, b.vy = 0, 0 end
+            for _, b in ipairs(self.balls) do b.vx, b.vy, b.ux, b.uy, b.e = 0, 0, 0, 0, 0 end
             self:Resolve()
             return ev, true
         end
@@ -334,7 +391,7 @@ local function Spot(self, b, x, y)
     for i = 0, 60 do
         for _, off in ipairs({ 0, -1, 1 }) do
             local px, py = x + off * i * 4, y - (off == 0 and i * 4 or 0)
-            if self:Free(px, py, b) then b.x, b.y, b.on, b.vx, b.vy = px, py, true, 0, 0; return end
+            if self:Free(px, py, b) then b.x, b.y, b.on, b.vx, b.vy, b.ux, b.uy, b.e = px, py, true, 0, 0, 0, 0, 0; return end
         end
     end
     b.x, b.y, b.on = x, y, true
@@ -507,6 +564,33 @@ function Pool:Pots(who, cx, cy)
     return out
 end
 
+-- Which way, and how briskly, the cue ball leaves its first contact once its spin has had its
+-- say: follow carries it on through, draw brings it back, a plain ball takes the tangent line.
+-- `sight` is what Sight returned. Returns dx, dy (a unit vector) and a speed, or nil for a cushion.
+function Pool:After(sight, angle, power, top)
+    if not sight or not sight.ball then return nil end
+    local v0 = Pool.MIN_V + (Pool.MAX_V - Pool.MIN_V) * max(0, min(1, power or 0.5))
+    local dx, dy = cos(angle), -sin(angle)
+    -- along the way there the skid wears off
+    local slip = v0 * (1 - SPIN_TOP * (top or 0))
+    local t = sight.dist / max(60, v0)
+    local v, u
+    if abs(slip) <= 3.5 * SLIDE * t then
+        v = v0 - (2 / 7) * slip; u = v
+    else
+        local sgn = slip > 0 and 1 or -1
+        v = v0 - sgn * SLIDE * t
+        u = v0 * SPIN_TOP * (top or 0) + sgn * 2.5 * SLIDE * t
+    end
+    -- the blow takes the part of its travel that runs through the struck ball; the spin stays
+    local k = sight.full or 1
+    local vx, vy = v * (dx - k * sight.ox), v * (dy - k * sight.oy)
+    local fx, fy = (5 / 7) * vx + (2 / 7) * u * dx, (5 / 7) * vy + (2 / 7) * u * dy
+    local sp = sqrt(fx * fx + fy * fy)
+    if sp < 1 then return 0, 0, 0 end
+    return fx / sp, fy / sp, sp
+end
+
 ---------------------------------------------------------------------------
 -- The regulars
 ---------------------------------------------------------------------------
@@ -515,14 +599,16 @@ function Pool:Clone()
     for k, v in pairs(self) do if type(v) ~= "table" then h[k] = v end end
     h.group = { you = self.group.you, foe = self.group.foe }
     h.balls = {}
-    for i, b in ipairs(self.balls) do h.balls[i] = { id = b.id, x = b.x, y = b.y, vx = 0, vy = 0, on = b.on } end
+    for i, b in ipairs(self.balls) do h.balls[i] = { id = b.id, x = b.x, y = b.y, vx = 0, vy = 0, ux = 0, uy = 0, e = 0, on = b.on } end
     return h
 end
 
--- What the opponent does with this table: { angle, power, place = { x, y } or nil }.
--- They pick the easiest pot they can see; the better ones play a few out in their head first
--- and take one that goes in. Their hands shake as much as their `err` says.
-function Pool:Think()
+-- What the opponent does with this table: { angle, power, top, side, place = { x, y } or nil }.
+-- They pick the easiest pot they can see, playing a few out in their head first and taking one
+-- that goes in without giving anything away. Their hands shake as much as their `err` says.
+-- The thinking is done a shot at a time (ThinkBegin, then ThinkStep until it answers) so the
+-- screen never has to wait for it.
+function Pool:ThinkBegin()
     local foe = Pool.FOES[self.foe or 1]
     local who = self.turn
     local c = self:Cue()
@@ -550,34 +636,46 @@ function Pool:Think()
     end
     local cx, cy = place and place.x or c.x, place and place.y or c.y
     local pots = self:Pots(who, cx, cy)
-    local pick
-    if #pots > 0 then
-        pick = pots[1]
-        -- think ahead: try the best few in the head and prefer one that drops without a foul
-        for i = 1, min(foe.look, #pots) do
-            local p = pots[i]
-            local h = self:Clone()
-            if place then h:Cue().x, h:Cue().y = place.x, place.y end
-            h.pending = nil
-            local a = atan2(-(p.gy - cy), p.gx - cx)
-            h.Snapshot = function() return nil end
-            h:Shoot(a, min(1, 0.30 + p.dist / 700))
-            local res = h:Run()
-            local good = res and not res.foul and not (res.eight and h.winner ~= who)
-            local dropped = false
-            for _, id in ipairs(res and res.potted or {}) do if id == p.ball then dropped = true end end
-            if good and dropped then pick = p; break end
-        end
+    -- the shots worth playing out in the head: the easiest few pots, each struck a few ways
+    local tries = {}
+    for i = 1, min(foe.look, #pots) do
+        for _, top in ipairs(foe.look >= 3 and { 0.4, -0.35, -0.8 } or { 0.4, -0.5 }) do tries[#tries + 1] = { pots[i], top } end
     end
-    local angle, power
-    if pick then
+    return { foe = foe, who = who, place = place, cx = cx, cy = cy, pots = pots, tries = tries, i = 0 }
+end
+
+-- Think one shot further. Returns the finished plan, or nil while there is more to consider.
+function Pool:ThinkStep(st)
+    local c = self:Cue()
+    local cx, cy = st.cx, st.cy
+    if not st.found and st.i < #st.tries then
+        st.i = st.i + 1
+        local p, top = st.tries[st.i][1], st.tries[st.i][2]
+        local h = self:Clone()
+        if st.place then h:Cue().x, h:Cue().y = st.place.x, st.place.y end
+        h.pending = nil
+        h.Snapshot = function() return nil end
+        h:Shoot(atan2(-(p.gy - cy), p.gx - cx), min(1, 0.30 + p.dist / 700), top, 0)
+        local res = h:Run()
+        local good = res and not res.foul and not (res.eight and h.winner ~= st.who)
+        local dropped = false
+        for _, id in ipairs(res and res.potted or {}) do if id == p.ball then dropped = true end end
+        if good and dropped then st.found = { p, top }
+        elseif good and not st.safe then st.safe = { p, top } end       -- failing a pot, a shot that gives nothing away
+        if not st.found and st.i < #st.tries then return nil end
+    end
+    local choice = st.found or st.safe or (st.pots[1] and { st.pots[1], 0.4 })
+    local angle, power, spin
+    if choice then
+        local pick = choice[1]
         angle = atan2(-(pick.gy - cy), pick.gx - cx)
         power = min(1, 0.30 + pick.dist / 700)
+        spin = choice[2]
     else
         -- nothing on: roll up to the nearest ball they are allowed to hit
         local best
         for _, b in ipairs(self.balls) do
-            if b.on and b.id ~= 0 and self:Legal(b.id, who) then
+            if b.on and b.id ~= 0 and self:Legal(b.id, st.who) then
                 local d = (b.x - cx) ^ 2 + (b.y - cy) ^ 2
                 local open = Clear(self, cx, cy, b.x, b.y, c, b)
                 local v = d * (open and 1 or 9)
@@ -585,12 +683,21 @@ function Pool:Think()
             end
         end
         angle = angle or pi / 2
-        power = 0.42
+        power, spin = 0.42, 0.4
     end
-    if self.breakShot then angle, power = atan2(-(FOOT_Y - cy), TW / 2 - cx), 0.95 end
+    if self.breakShot then angle, power, spin = atan2(-(FOOT_Y - cy), TW / 2 - cx), 0.95, 0 end
     -- an unsteady hand: two throws of the dice make most shots near the mark and a few well off
-    local wobble = (self:Rand() + self:Rand() - 1) * foe.err * (self.breakShot and 0.3 or 1)
-    return { angle = angle + wobble, power = power, place = place }
+    local wobble = (self:Rand() + self:Rand() - 1) * st.foe.err * (self.breakShot and 0.3 or 1)
+    return { angle = angle + wobble, power = power, top = spin, side = 0, place = st.place }
+end
+
+-- the whole thought at once
+function Pool:Think()
+    local st = self:ThinkBegin()
+    for _ = 1, 40 do
+        local plan = self:ThinkStep(st)
+        if plan then return plan end
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -607,7 +714,7 @@ function Pool:Serialize()
     if self.phase ~= "aim" and self.phase ~= "roll" then return nil end
     local s = self.pending and self.pending.before or self:Snapshot()
     local out = { v = 1, mode = self.mode, day = self.day, level = self.foe, table = s }
-    if self.pending then out.angle, out.power = self.pending.angle, self.pending.power end
+    if self.pending then out.angle, out.power, out.top, out.side = self.pending.angle, self.pending.power, self.pending.top, self.pending.side end
     return out
 end
 
@@ -624,7 +731,7 @@ function Pool:Restore(s)
         if id ~= floor(id) or id < 0 or id > 15 or seen[id] or (i == 1) ~= (id == 0) then return false end
         if b[2] ~= b[2] or b[3] ~= b[3] or b[2] < 0 or b[2] > TW or b[3] < 0 or b[3] > TH then return false end
         seen[id] = true
-        balls[i] = { id = id, x = b[2], y = b[3], vx = 0, vy = 0, on = b[4] == 1 }
+        balls[i] = { id = id, x = b[2], y = b[3], vx = 0, vy = 0, ux = 0, uy = 0, e = 0, on = b[4] == 1 }
     end
     if not balls[1].on then return false end
     local function kind(v) return (v == "solid" or v == "stripe") and v or nil end
@@ -644,7 +751,7 @@ function Pool:Restore(s)
     if self:Left() == 0 then self.phase = "idle"; return false end
     -- a shot was in the air when the save was made: play it out
     if type(s.angle) == "number" and type(s.power) == "number" then
-        self:Shoot(s.angle, s.power)
+        self:Shoot(s.angle, s.power, tonumber(s.top), tonumber(s.side))
         self:Run()
     end
     return true

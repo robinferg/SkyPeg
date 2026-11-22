@@ -15,6 +15,8 @@
 **Tavern Pool.** Eight-ball on a proper table: sixteen balls, six pockets, cushions with jaws, and the rules of the game.
 
 - Point to aim; the line shows what the cue ball will strike and which way that ball sets off. Press, pull back along the cue for power, and let go. The mouse wheel turns the aim a hair
+- **Spin.** Drag the dot on the cue ball to where the tip should strike: high and the cue ball runs on after it hits, low and it stops dead or comes back, left or right and it comes off the cushions that way. Balls skid before they settle into a roll, as real ones do
+- Balls turn as they roll (the cue ball's two red dots give its spin away) and drop into the pockets
 - Three regulars to play, from the Barkeep to the Hustler. Pot the first ball after the break to take solids or stripes, clear yours, then the eight
 - Fouls give the other player the cue ball in hand
 - A Solo table and a Daily Table (the same balls for everyone): clear them in the fewest shots, with leaderboards for both

@@ -53,48 +53,109 @@ function UI:Record(i)
 end
 
 ---------------------------------------------------------------------------
--- A ball, drawn from plain discs: solids are a full colour with a pale spot, stripes are white
--- with a band of colour round the middle, the eight is black, the cue ball white
+-- A ball. It is a coloured disc carrying marks that sit on a sphere and turn with it: a solid
+-- has one pale spot, a stripe has a white cap at each pole (so its band shows between them), the
+-- eight has a white spot, and the cue ball two small red dots that give its spin away. The marks
+-- are cut to the ball's outline, so they slide round the edge and out of sight as it rolls.
 ---------------------------------------------------------------------------
 local function NewBall(parent, size, layer, sub)
-    local b = { size = size }
-    b.shadow = parent:CreateTexture(nil, layer, nil, sub)
-    b.shadow:SetTexture(W.MEDIA .. "circle"); b.shadow:SetVertexColor(0, 0, 0, 0.35)
-    b.base = parent:CreateTexture(nil, layer, nil, sub + 1)
-    b.base:SetTexture(W.MEDIA .. "circle")
-    b.mid = parent:CreateTexture(nil, layer, nil, sub + 2)
-    b.mid:SetTexture(W.MEDIA .. "circle")
-    b.shine = parent:CreateTexture(nil, layer, nil, sub + 3)
-    b.shine:SetTexture(W.MEDIA .. "circle"); b.shine:SetVertexColor(1, 1, 1, 0.55)
-    b.all = { b.shadow, b.base, b.mid, b.shine }
+    local b = { size = size, px = 0, py = 0, pz = 1, qx = 1, qy = 0, qz = 0 }
+    local function disc(s2, r, g, bl, a)
+        local t = parent:CreateTexture(nil, layer, nil, s2)
+        t:SetTexture(W.MEDIA .. "circle")
+        if r then t:SetVertexColor(r, g, bl, a or 1) end
+        return t
+    end
+    b.shadow = disc(sub, 0, 0, 0, 0.35)
+    b.base = disc(sub + 1)
+    b.m1, b.m2 = disc(sub + 2), disc(sub + 2)
+    b.shine = disc(sub + 3, 1, 1, 1, 0.5)
+    if parent.CreateMaskTexture and b.m1.AddMaskTexture then
+        b.mask = parent:CreateMaskTexture()
+        b.mask:SetTexture(W.MEDIA .. "circle", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        b.m1:AddMaskTexture(b.mask); b.m2:AddMaskTexture(b.mask)
+    end
+    b.all = { b.shadow, b.base, b.m1, b.m2, b.shine }
     function b:Set(id)
         if self.id == id then return end
         self.id = id
         local c = Pool.Color(id)
         local kind = Pool.Kind(id)
+        self.base:SetVertexColor(c[1], c[2], c[3])
+        self.kind = kind
         if kind == "stripe" then
-            self.base:SetVertexColor(0.96, 0.95, 0.90)
-            self.mid:SetVertexColor(c[1], c[2], c[3])
-            self.midK = 0.66
+            self.m1:SetVertexColor(0.96, 0.95, 0.90); self.m2:SetVertexColor(0.96, 0.95, 0.90)
+            self.markK = 0.64
         elseif kind == "cue" then
-            self.base:SetVertexColor(c[1], c[2], c[3])
-            self.mid:SetVertexColor(1, 1, 1)
-            self.midK = 0.5
+            self.m1:SetVertexColor(0.85, 0.12, 0.10); self.m2:SetVertexColor(0.85, 0.12, 0.10)
+            self.markK = 0.17
         else
-            self.base:SetVertexColor(c[1], c[2], c[3])
-            self.mid:SetVertexColor(0.96, 0.95, 0.90)
-            self.midK = 0.36
+            self.m1:SetVertexColor(0.96, 0.95, 0.90)
+            self.markK = 0.40
         end
     end
-    function b:Put(anchor, x, y, scale, alpha)
+    -- which way up the ball lies: p is the first mark, q a second axis at right angles to it
+    function b:Face(px, py, pz, qx, qy, qz)
+        self.px, self.py, self.pz = px, py, pz
+        if qx then self.qx, self.qy, self.qz = qx, qy, qz end
+    end
+    local function mark(self, t, anchor, x, y, s, mx, my, mz, alpha, dim)
+        -- a mark at (mx, my, mz) on the unit ball (z towards the eye): seen while it faces us,
+        -- and a little longer for a big cap, whose edge is still in view past the rim
+        local big = self.markK > 0.5
+        if mz < (big and -0.62 or 0.02) or (not self.mask and mz < 0.45) then t:Hide(); return end
+        local k = self.markK * (big and 1 or (0.55 + 0.45 * mz))
+        t:ClearAllPoints()
+        t:SetPoint("CENTER", anchor, "TOPLEFT", x + mx * s * 0.5, -(y + my * s * 0.5))
+        t:SetSize(s * k, s * k)
+        t:SetAlpha(alpha)
+        t:Show()
+    end
+    function b:Put(anchor, x, y, scale, alpha, dim)
         local s = self.size * (scale or 1)
-        for _, t in ipairs(self.all) do t:ClearAllPoints(); t:SetAlpha(alpha or 1); t:Show() end
-        self.shadow:SetPoint("CENTER", anchor, "TOPLEFT", x + 1.5, -(y + 2)); self.shadow:SetSize(s, s); self.shadow:SetAlpha(0.35 * (alpha or 1))
-        self.base:SetPoint("CENTER", anchor, "TOPLEFT", x, -y); self.base:SetSize(s, s)
-        self.mid:SetPoint("CENTER", anchor, "TOPLEFT", x, -y); self.mid:SetSize(s * self.midK, s * self.midK)
-        self.shine:SetPoint("CENTER", anchor, "TOPLEFT", x - s * 0.2, -(y - s * 0.22)); self.shine:SetSize(s * 0.2, s * 0.2); self.shine:SetAlpha(0.55 * (alpha or 1))
+        alpha = alpha or 1
+        self.shadow:ClearAllPoints(); self.shadow:SetPoint("CENTER", anchor, "TOPLEFT", x + 1.5, -(y + 2)); self.shadow:SetSize(s, s)
+        self.shadow:SetAlpha(0.35 * alpha); self.shadow:Show()
+        self.base:ClearAllPoints(); self.base:SetPoint("CENTER", anchor, "TOPLEFT", x, -y); self.base:SetSize(s, s); self.base:SetAlpha(alpha); self.base:Show()
+        if dim then
+            local c = Pool.Color(self.id)
+            self.base:SetVertexColor(c[1] * dim, c[2] * dim, c[3] * dim)
+            self.dimmed = true
+        elseif self.dimmed then
+            local c = Pool.Color(self.id)
+            self.base:SetVertexColor(c[1], c[2], c[3])
+            self.dimmed = nil
+        end
+        if self.mask then self.mask:ClearAllPoints(); self.mask:SetPoint("CENTER", anchor, "TOPLEFT", x, -y); self.mask:SetSize(s, s) end
+        mark(self, self.m1, anchor, x, y, s, self.px, self.py, self.pz, alpha)
+        if self.kind == "stripe" then mark(self, self.m2, anchor, x, y, s, -self.px, -self.py, -self.pz, alpha)
+        elseif self.kind == "cue" then mark(self, self.m2, anchor, x, y, s, self.qx, self.qy, self.qz, alpha)
+        else self.m2:Hide() end
+        self.shine:ClearAllPoints(); self.shine:SetPoint("CENTER", anchor, "TOPLEFT", x - s * 0.2, -(y - s * 0.22)); self.shine:SetSize(s * 0.2, s * 0.2)
+        self.shine:SetAlpha(0.5 * alpha); self.shine:Show()
     end
     function b:Hide() for _, t in ipairs(self.all) do t:Hide() end end
+    -- roll the ball: (ux, uy) is its surface speed over the cloth in screen units, e its side spin
+    function b:Turn(ux, uy, e, dt, R)
+        local sp = sqrt(ux * ux + uy * uy)
+        if sp > 0.5 then
+            local th = sp * dt / R
+            local c, sn = cos(th), sin(th)
+            local dx, dy = ux / sp, uy / sp
+            for _, v in ipairs({ "p", "q" }) do
+                local x, y, z = self[v .. "x"], self[v .. "y"], self[v .. "z"]
+                local along = x * dx + y * dy
+                local a2, z2 = along * c + z * sn, z * c - along * sn
+                self[v .. "x"], self[v .. "y"], self[v .. "z"] = x + (a2 - along) * dx, y + (a2 - along) * dy, z2
+            end
+        end
+        if e ~= 0 then
+            local ph = e * dt / R
+            local c, sn = cos(ph), sin(ph)
+            self.px, self.py = self.px * c + self.py * sn, -self.px * sn + self.py * c
+            self.qx, self.qy = self.qx * c + self.qy * sn, -self.qx * sn + self.qy * c
+        end
+    end
     return b
 end
 
@@ -185,6 +246,8 @@ function UI:Build(parent)
     -- the balls, the sight line, the cue
     self.sprites = {}
     for i = 1, 16 do self.sprites[i] = NewBall(board, 2 * R, "ARTWORK", -4) end
+    self.sinkers, self.sinks = {}, {}       -- balls on their way down a pocket
+    for i = 1, 6 do self.sinkers[i] = NewBall(board, 2 * R, "BORDER", 2) end
     local function pill(layer, sub)
         local t = board:CreateTexture(nil, layer or "ARTWORK", nil, sub or 2)
         t:SetTexture(W.MEDIA .. "pill")
@@ -231,6 +294,35 @@ function UI:Build(parent)
         c.big:SetPoint("TOP", board, "TOPLEFT", cx, -62)
         self.cols[side] = c
     end
+    -- where the tip strikes the cue ball: drag the dot (right-click puts it back in the middle)
+    local sp = CreateFrame("Button", nil, board)
+    sp:SetSize(58, 58)
+    sp:SetPoint("CENTER", board, "TOPLEFT", 37, -(FH - 76))
+    sp:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    sp.ball = sp:CreateTexture(nil, "ARTWORK"); sp.ball:SetTexture(W.MEDIA .. "circle"); sp.ball:SetAllPoints(); sp.ball:SetVertexColor(0.95, 0.94, 0.90)
+    sp.h = W.Solid(sp, "OVERLAY", 0, 0, 0, 0.18); sp.h:SetSize(50, 1); sp.h:SetPoint("CENTER")
+    sp.v = W.Solid(sp, "OVERLAY", 0, 0, 0, 0.18); sp.v:SetSize(1, 50); sp.v:SetPoint("CENTER")
+    sp.shine = sp:CreateTexture(nil, "OVERLAY"); sp.shine:SetTexture(W.MEDIA .. "circle"); sp.shine:SetVertexColor(1, 1, 1, 0.7)
+    sp.shine:SetSize(10, 10); sp.shine:SetPoint("CENTER", -13, 14)
+    sp.dot = sp:CreateTexture(nil, "OVERLAY", nil, 2); sp.dot:SetTexture(W.MEDIA .. "circle"); sp.dot:SetVertexColor(0.9, 0.12, 0.1); sp.dot:SetSize(12, 12)
+    sp:SetScript("OnMouseDown", function(_, button) if button == "LeftButton" then self.spinDrag = true end end)
+    sp:SetScript("OnMouseUp", function() self.spinDrag = nil end)
+    sp:SetScript("OnClick", function(_, button) if button == "RightButton" then self.top, self.side = 0, 0 end end)
+    sp:SetScript("OnEnter", function(btn)
+        if not GameTooltip then return end
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP", 0, 4)
+        GameTooltip:SetText("Spin", 1, 0.82, 0.38)
+        GameTooltip:AddLine("Drag the dot to where the cue tip should strike. High: the cue ball runs on after it hits (follow). Low: it stops or comes back (draw). Left or right: it comes off the cushions that way.", 1, 1, 1, true)
+        GameTooltip:AddLine("Right-click to go back to the middle.", 0.62, 0.88, 0.54)
+        GameTooltip:Show()
+    end)
+    sp:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+    self.spin = sp
+    self.spinLabel = W.Text(board, 10, W.FONT)
+    self.spinLabel:SetPoint("TOP", sp, "BOTTOM", 0, -4)
+    self.spinLabel:SetTextColor(0.8, 0.8, 0.85)
+    self.top, self.side = 0, 0
+
     self.banner = W.Text(board, 15, W.FONT_TITLE, "OUTLINE")
     self.banner:SetPoint("CENTER", board, "TOPLEFT", OX + TW / 2, -(OY + TH * 0.52))
     self.banner:SetWidth(TW - 20)
@@ -285,6 +377,7 @@ function UI:Build(parent)
     if run and (run.mode ~= "daily" or run.day == Today()) and self.game:Restore(run) then
         if self.game.phase == "over" then self.finishPending = true end
         self.placing = self.game.phase == "aim" and self.game.inHand and self.game.turn == "you"
+        self:FaceBalls()
     else
         self.db.run = nil
         self.game = Pool.New()
@@ -319,21 +412,71 @@ function UI:Say(text, col, secs)
     self.bannerT = secs or 2.2
 end
 
-function UI:DrawBalls()
+-- how the balls lie when the table is set: each a little differently, so a rack looks like a rack
+function UI:FaceBalls()
+    for i, s in ipairs(self.sprites) do
+        local b = self.game.balls[i]
+        if b then
+            local a1, a2 = (b.id * 2.399) % (2 * pi), 0.5 + (b.id * 0.731) % 1.0
+            local px, py, pz = sin(a2) * cos(a1), sin(a2) * sin(a1), cos(a2)
+            -- a second axis square to the first
+            local qx, qy, qz = -sin(a1), cos(a1), 0
+            s:Face(px, py, pz, qx, qy, qz)
+        end
+    end
+    self.sinks = {}
+    for _, s in ipairs(self.sinkers) do s:Hide(); s.busy = nil end
+end
+
+function UI:DrawBalls(el)
     local g = self.game
+    local rolling = g.phase == "roll"
     for i, s in ipairs(self.sprites) do
         local b = g.balls[i]
         if b and b.on then
             s:Set(b.id)
+            if rolling and el and (b.ux ~= 0 or b.uy ~= 0 or b.e ~= 0) then s:Turn(b.ux, b.uy, b.e, el, R) end
             s:Put(self.board, OX + b.x, OY + b.y)
         else
             s:Hide()
         end
     end
+    -- balls going down: drawn into the pocket, shrinking and darkening as they drop out of sight
+    local i = 1
+    while i <= #self.sinks do
+        local k = self.sinks[i]
+        k.t = k.t + (el or 0)
+        local u = k.t / 0.30
+        if u >= 1 then
+            k.s:Hide(); k.s.busy = nil
+            table.remove(self.sinks, i)
+        else
+            local e = u * (2 - u)
+            k.s:Turn(k.vx, k.vy, 0, el or 0, R)
+            k.s:Put(self.board, OX + k.x + (k.px - k.x) * e, OY + k.y + (k.py - k.y) * e, 1 - 0.42 * e, 1 - u * u, 1 - 0.75 * e)
+            i = i + 1
+        end
+    end
+end
+
+function UI:Sink(p)
+    local s
+    for _, c in ipairs(self.sinkers) do if not c.busy then s = c; break end end
+    if not s then return end
+    s.busy = true
+    s:Set(p.id)
+    -- it keeps the face it had on the table
+    for i, b in ipairs(self.game.balls) do
+        if b.id == p.id then local o = self.sprites[i]; s:Face(o.px, o.py, o.pz, o.qx, o.qy, o.qz) end
+    end
+    local pk = Pool.POCKETS[p.pocket]
+    local dx, dy = pk.x - p.x, pk.y - p.y
+    local d = sqrt(dx * dx + dy * dy)
+    self.sinks[#self.sinks + 1] = { s = s, t = 0, x = p.x, y = p.y, px = pk.x, py = pk.y, vx = d > 0 and dx / d * 160 or 0, vy = d > 0 and dy / d * 160 or 0 }
 end
 
 -- the sight line, the ghost ball and the cue for a shot along `angle` with `pull` (0..1) on it
-function UI:DrawAim(angle, pull, mine)
+function UI:DrawAim(angle, pull, mine, power, top)
     local g = self.game
     local c = g:Cue()
     local s = g:Sight(angle)
@@ -355,9 +498,15 @@ function UI:DrawAim(angle, pull, mine)
             local len = 18 + 44 * (s.full or 1)
             Line(self.objLine, self.board, OX + b.x + s.ox * R, OY + b.y + s.oy * R, OX + b.x + s.ox * (R + len), OY + b.y + s.oy * (R + len), 2)
             self.objLine:SetVertexColor(min(1, col[1] + 0.25), min(1, col[2] + 0.25), min(1, col[3] + 0.25), legal and 0.9 or 0.35)
-            local cl = 26 * (1 - (s.full or 1)) + 4
-            Line(self.cueLine, self.board, gx + s.cx * R, gy + s.cy * R, gx + s.cx * (R + cl), gy + s.cy * (R + cl), 1.5)
-            self.cueLine:SetVertexColor(1, 1, 1, 0.4)
+            -- and where the cue ball goes afterwards, with whatever spin is on it
+            local fx, fy, fs = g:After(s, angle, power or 0.5, top or 0)
+            if fs and fs > 12 then
+                local cl = min(64, 10 + fs * 0.16)
+                Line(self.cueLine, self.board, gx + fx * R, gy + fy * R, gx + fx * (R + cl), gy + fy * (R + cl), 1.5)
+                self.cueLine:SetVertexColor(1, 1, 1, 0.45)
+            else
+                self.cueLine:Hide()
+            end
         else
             self.objLine:Hide(); self.cueLine:Hide()
         end
@@ -365,7 +514,8 @@ function UI:DrawAim(angle, pull, mine)
         self.sight:Hide(); self.ghost:Hide(); self.objLine:Hide(); self.cueLine:Hide()
     end
     -- the cue, drawn back by the pull
-    local back = R + 5 + pull * 46
+    local back = R + 4 + pull * 46
+    self.stick:SetAlpha(1); self.stickTip:SetAlpha(1)
     Line(self.stick, self.board, x0 - dx * (back + 8), y0 - dy * (back + 8), x0 - dx * (back + 170), y0 - dy * (back + 170), 4)
     Line(self.stickTip, self.board, x0 - dx * back, y0 - dy * back, x0 - dx * (back + 9), y0 - dy * (back + 9), 3)
 end
@@ -399,7 +549,7 @@ end
 ---------------------------------------------------------------------------
 -- Input
 ---------------------------------------------------------------------------
-function UI:IsBusy() return self.game.phase == "roll" end
+function UI:IsBusy() return self.game.phase == "roll" or self.strike ~= nil or #self.sinks > 0 end
 
 function UI:Paused()
     return (NS.Shell and NS.Shell:IsModal()) or self.card:IsShown() or self.menu:IsShown() or self.boardPanel:IsShown()
@@ -416,7 +566,7 @@ end
 
 function UI:MyShot()
     local g = self.game
-    return g.phase == "aim" and g.turn == "you" and not self:Paused()
+    return g.phase == "aim" and g.turn == "you" and not self.strike and not self:Paused()
 end
 
 function UI:MouseDown(button)
@@ -444,7 +594,7 @@ function UI:MouseUp(button)
     self.drag = nil
     if not d then return end
     if self.power >= 0.04 then
-        self:Shoot(self.angle, self.power)
+        self:Shoot(self.angle, self.power, self.top, self.side)
     end
     self.power = 0
 end
@@ -481,17 +631,36 @@ function UI:UpdateMine()
             self.angle = atan2(-(my - c.y), mx - c.x)
         end
     end
-    self:DrawAim(self.angle, self.drag and self.power or 0, true)
+    self:DrawAim(self.angle, self.drag and self.power or 0, true, self.drag and self.power or 0.5, self.top)
 end
 
-function UI:Shoot(angle, power)
+-- the cue comes through the ball (a tenth of a second), then the shot is on its way
+function UI:Shoot(angle, power, top, side)
+    if self.strike or self.game.phase ~= "aim" then return end
+    self.strike = { angle = angle, power = power, top = top or 0, side = side or 0, t = 0 }
+    self.lock, self.drag = nil, nil
+end
+
+function UI:StepStrike(el)
+    local k = self.strike
+    k.t = k.t + el
+    local u = min(1, k.t / 0.09)
+    self:DrawAim(k.angle, k.power * (1 - u) - 0.1 * u, false)
+    if u >= 1 then
+        self.strike = nil
+        self:Fire(k.angle, k.power, k.top, k.side)
+    end
+end
+
+function UI:Fire(angle, power, top, side)
     local g = self.game
-    if not g:Shoot(angle, power) then return end
+    if not g:Shoot(angle, power, top, side) then return end
     -- saved with the shot on it, so a window closed while the balls roll loses nothing
     self:Save()
-    self:HideAim()
+    self.sight:Hide(); self.ghost:Hide(); self.objLine:Hide(); self.cueLine:Hide()
+    self.stickFade = 0.35
     W.SFX("putt", 0.05)
-    self.lock = nil
+    self.top, self.side = 0, 0
 end
 
 function UI:Save()
@@ -513,14 +682,17 @@ function UI:UpdateFoe(el)
     local g = self.game
     local ai = self.ai
     if not ai then
-        ai = { stage = "wait", t = 0.7 }
+        ai = { stage = "wait", t = 0.6 }
         self.ai = ai
     end
     ai.t = ai.t - el
     if ai.stage == "wait" then
         self:HideAim()
-        if ai.t <= 0 then
-            ai.plan = g:Think()
+        if ai.t <= 0 then ai.stage, ai.think = "think", g:ThinkBegin() end
+    elseif ai.stage == "think" then
+        -- one imagined shot a frame, so the screen never waits on them
+        ai.plan = g:ThinkStep(ai.think)
+        if ai.plan then
             if ai.plan.place then g:PlaceCue(ai.plan.place.x, ai.plan.place.y) end
             ai.stage, ai.t = "aim", 1.0
         end
@@ -529,7 +701,7 @@ function UI:UpdateFoe(el)
         self:DrawAim(ai.plan.angle, ai.plan.power * min(1, k * 1.4), false)
         if ai.t <= 0 then
             self.ai = nil
-            self:Shoot(ai.plan.angle, ai.plan.power)
+            self:Shoot(ai.plan.angle, ai.plan.power, ai.plan.top, ai.plan.side)
         end
     end
 end
@@ -648,12 +820,13 @@ function UI:OnUpdate(el)
             if ev.hit > 25 then W.SFX("knock", 0.035) end
             if ev.rail > 60 then W.SFX("pop3", 0.06) end
             for _, p in ipairs(ev.pots) do
-                self:Burst(OX + p.x, OY + p.y, p.id == 0 and { 1, 0.4, 0.3 } or { 1, 0.9, 0.6 }, 10)
-                W.SFX(p.id == 0 and "lose" or ("pop" .. (4 + p.id % 4)), 0.04)
+                self:Sink(p)
+                W.SFX("cup", 0.05)
             end
-            self:HideAim()
             if #ev.pots > 0 then self:RefreshHUD() end
             if done then self:AfterShot(g.last) end
+        elseif self.strike then
+            self:StepStrike(el)
         elseif g.phase == "aim" then
             if g.turn == "you" then self:UpdateMine() else self:UpdateFoe(el) end
         else
@@ -662,8 +835,38 @@ function UI:OnUpdate(el)
     elseif g.phase ~= "roll" then
         self:HideAim()
     end
-    self:DrawBalls()
+    self:DrawBalls(self:Paused() and 0 or el)
     self:UpdateFX(el)
+    -- the cue lifts away after the stroke
+    if g.phase == "roll" then
+        self.stickFade = (self.stickFade or 0) - el
+        if self.stickFade > 0 then
+            self.stick:SetAlpha(self.stickFade / 0.35); self.stickTip:SetAlpha(self.stickFade / 0.35)
+        else
+            self.stick:Hide(); self.stickTip:Hide()
+        end
+    end
+    -- the spin picker
+    local mine = g.phase == "aim" and g.turn == "you" and not self.placing
+    self.spin:SetShown(mine); self.spinLabel:SetShown(mine)
+    if mine then
+        if self.spinDrag and IsMouseButtonDown and not IsMouseButtonDown("LeftButton") then self.spinDrag = nil end
+        if self.spinDrag then
+            local x, y = GetCursorPosition()
+            local sc = self.spin:GetEffectiveScale()
+            local cx, cy = self.spin:GetCenter()
+            if cx then
+                local sx, sy = (x / sc - cx) / 22, (y / sc - cy) / 22
+                local l = sqrt(sx * sx + sy * sy)
+                if l > 1 then sx, sy = sx / l, sy / l end
+                self.side, self.top = sx, sy
+            end
+        end
+        self.spin.dot:ClearAllPoints()
+        self.spin.dot:SetPoint("CENTER", self.spin, "CENTER", self.side * 22, self.top * 22)
+        local t, sd = self.top, self.side
+        self.spinLabel:SetText((abs(t) < 0.12 and abs(sd) < 0.12) and "SPIN" or ((t > 0.3 and "FOLLOW" or (t < -0.3 and "DRAW" or "")) .. ((abs(sd) > 0.3 and (t > 0.3 or t < -0.3)) and " + " or "") .. (sd > 0.3 and "RIGHT" or (sd < -0.3 and "LEFT" or ""))))
+    end
     -- power bar
     local showPower = g.phase == "aim" and g.turn == "you" and not self.placing
     self.powerBg:SetShown(showPower); self.powerFill:SetShown(showPower and self.power > 0); self.powerText:SetShown(showPower)
@@ -773,6 +976,8 @@ function UI:Begin(mode, opts)
     self.counted = false
     self.placing = g.inHand and g.turn == "you"
     self.angle = pi / 2
+    self.strike, self.top, self.side = nil, 0, 0
+    self:FaceBalls()
     self:Save()
     W.SFX("launch")
     if g.mode == "match" then self:Say("Your break", COLORS.gold, 1.8)
@@ -802,8 +1007,9 @@ end
 
 -- the window is closing: a shot still rolling is played out, so the table is at rest in the save
 function UI:OnHide()
-    self.drag, self.power = nil, 0
+    self.drag, self.power, self.spinDrag = nil, 0, nil
     local g = self.game
+    if self.strike then local k = self.strike; self.strike = nil; self:Fire(k.angle, k.power, k.top, k.side) end
     if g.phase == "roll" then
         g:Run()
         self:AfterShot(g.last)
@@ -873,6 +1079,8 @@ function UI:ShowHelp()
             "|cffffcc40Aim|r by pointing where the cue ball should go. The line shows what it will strike and which way that ball sets off. The mouse wheel turns the aim a hair (Shift for a finer hair).",
             "",
             "|cffffcc40Shoot|r: press and hold, draw the pointer back for power (the further, the harder), and let go. Right-click lets the cue down without shooting.",
+            "",
+            "|cffffcc40Spin|r: drag the red dot on the cue ball (bottom left) to where the tip should strike. High makes the cue ball run on after it hits, low stops it or brings it back, left and right change how it comes off the cushions.",
             "",
             "|cffffcc40Eight-ball|r: the first ball you pot after the break makes you solids or stripes. Pot all seven of yours, then the black eight, to win. Pot one of yours and you shoot again.",
             "",

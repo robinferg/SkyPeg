@@ -33,7 +33,10 @@ anything left hanging from nothing falls. Falling orbs are worth far more, so cu
 The table stands the long way up and you shoot from the bottom.
 - **Aim** by pointing where the cue ball should go. The line shows what it will strike and which way that ball sets off.
   The mouse wheel turns the aim a hair (hold Shift for a finer one).
-- **Shoot:** press, pull back along the cue for power, and let go. Right-click lets the cue down without shooting.
+- **Shoot:** press and hold, draw the pointer back for power (the further, the harder), and let go. Right-click lets the cue down without shooting.
+- **Spin:** drag the red dot on the cue ball (bottom left) to where the tip should strike. High makes the cue ball run
+  on after it hits (follow), low stops it or brings it back (draw), left and right change how it comes off the cushions.
+  Right-click the cue ball to go back to the middle. The line past the ghost ball shows where the cue ball will go.
 - **Eight-ball:** the first ball you pot after the break makes you solids or stripes. Pot all seven, then the eight.
   Pot one of yours and you shoot again. A foul (the cue ball down a pocket, nothing struck, the wrong ball struck first)
   gives the other player the cue ball in hand. The eight down too soon loses the frame.
