@@ -31,13 +31,18 @@ anything left hanging from nothing falls. Falling orbs are worth far more, so cu
 
 ## Tavern Pool
 The table stands the long way up and you shoot from the bottom.
-- **Aim** by pointing where the cue ball should go. The line shows what it will strike and which way that ball sets off.
+- **Aim:** press on the table and the cue points at the pointer. Hold and move to swing it round; it stays where you
+  leave it. The line shows what the cue ball will strike and which way that ball sets off.
   The mouse wheel turns the aim a hair (hold Shift for a finer one).
-- **Shoot:** press and hold, draw the pointer back for power (the further, the harder), and let go. Right-click lets the cue down without shooting.
-- **Spin:** drag the red dot on the cue ball (bottom left) to where the tip should strike. High makes the cue ball run
+- **Shoot:** press on the **power bar** (left of the table), draw the cue down and let go. The further you draw it, the
+  harder the shot, and the cue on the table comes back just as far. Push it back up, or right-click, to let the cue down
+  without shooting.
+- **Spin:** drag the red dot on the cue ball (bottom right) to where the tip should strike. High makes the cue ball run
   on after it hits (follow), low stops it or brings it back (draw), left and right change how it comes off the cushions.
   Right-click the cue ball to go back to the middle. The line past the ghost ball shows where the cue ball will go.
-- **Eight-ball:** the first ball you pot after the break makes you solids or stripes. Pot all seven, then the eight.
+- **Alliance and Horde balls:** seven blue balls with the Alliance crest, seven red with the Horde's, and a skull on the
+  eight. The menu has a switch for classic solids and stripes.
+- **Eight-ball:** the first ball you pot after the break makes you Alliance or Horde (solids or stripes). Pot all seven, then the eight.
   Pot one of yours and you shoot again. A foul (the cue ball down a pocket, nothing struck, the wrong ball struck first)
   gives the other player the cue ball in hand. The eight down too soon loses the frame.
 - Three regulars: the Barkeep, the Brawler and the Hustler.
@@ -81,8 +86,8 @@ punchbowl. The break is the obstacle, and the skill shot: read it right and the 
 
 **Reading it**: light and shadow show the shape of the green, thin contour lines crowd together where it is steep, and
 high ground is paler than low. Pull back to putt (or watch for a moment as a hole opens) and small beads drift downhill
-all over it: pale and slow on a gentle lean, amber and quick on a steep one, red where it is too steep for a ball to stop
-(it will roll on down). A putt across a slope **breaks** downhill, and breaks more the slower it is rolling; uphill costs
+all over it: pale and slow on a gentle lean, amber and quick on a steep one, red where it is too steep for a ball to
+stop (it will roll on down until the ground eases off). A putt across a slope **breaks** downhill, and breaks more the slower it is rolling; uphill costs
 pace and downhill gives it. A punchbowl carries anything that dies inside it to the cup.
 
 A few holes also keep one wall or post standing where the easy putt would go. Openings are never less than half the

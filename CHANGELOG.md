@@ -14,13 +14,17 @@
 
 **Tavern Pool.** Eight-ball on a proper table: sixteen balls, six pockets, cushions with jaws, and the rules of the game.
 
-- Point to aim; the line shows what the cue ball will strike and which way that ball sets off. Press, pull back along the cue for power, and let go. The mouse wheel turns the aim a hair
+- Press on the table to aim: the cue points at the pointer and stays where you leave it. The line shows what the cue ball will strike and which way that ball sets off. The mouse wheel turns the aim a hair
+- Draw the power bar down and let go to shoot. The cue on the table comes back as far as you pull, and a long pull is a hard shot
+- **Alliance and Horde balls:** seven blue with the Alliance crest, seven red with the Horde's, and a skull on the eight. A switch in the menu brings back classic solids and stripes
 - **Spin.** Drag the dot on the cue ball to where the tip should strike: high and the cue ball runs on after it hits, low and it stops dead or comes back, left or right and it comes off the cushions that way. Balls skid before they settle into a roll, as real ones do
 - Balls turn as they roll (the cue ball's two red dots give its spin away) and drop into the pockets
-- Three regulars to play, from the Barkeep to the Hustler. Pot the first ball after the break to take solids or stripes, clear yours, then the eight
+- Three regulars to play, from the Barkeep to the Hustler. Pot the first ball after the break to take your seven, clear them, then the eight
 - Fouls give the other player the cue ball in hand
 - A Solo table and a Daily Table (the same balls for everyone): clear them in the fewest shots, with leaderboards for both
 - Saved after every shot, even with the balls still rolling. `/fb pool` jumps straight in
+
+**Gryphon Greens: a ball no longer sits on a steep slope.** Grass now holds a slow ball less than a fast one. A putt that runs out of pace on steep ground rolls back down and keeps rolling until the ground eases off. The red beads mark exactly the ground a ball cannot stop on. Putts also die a little more softly on the flat, and three greens that lean all one way (Iceflow Lake, Ban'ethil Barrow, the Gates of Orgrimmar) lean a little less, so a ball can still be stopped on them. Because balls roll differently, golf best times and golf score boards start fresh.
 
 **Nothing you have earned gets lost.**
 

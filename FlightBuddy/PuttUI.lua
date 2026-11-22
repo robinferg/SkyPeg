@@ -115,10 +115,10 @@ function UI:Init(db)
     db.holes, db.aces, db.dailies, db.underPar = db.holes or 0, db.aces or 0, db.dailies or 0, db.underPar or 0
     -- When the courses themselves change, best times set on the old ones are retired (stats, unlocks
     -- and the flight log stay) and a round saved part-way through the old holes is dropped: 2.2 made
-    -- every hole harder, 2.3 reshaped every green, 2.3.1 made the slopes much stronger. Nothing else
-    -- in Flight Buddy is ever reset.
-    if db.rev ~= 4 then
-        db.rev = 4
+    -- every hole harder, 2.3 reshaped every green, 2.3.1 made the slopes much stronger, and 2.4 stopped
+    -- a ball sitting still on a steep one. Nothing else in Flight Buddy is ever reset.
+    if db.rev ~= Putt.C.REV then
+        db.rev = Putt.C.REV
         db.quickBest, db.courseBest, db.round = nil, nil, nil
         local d = db.daily[NS.Social.Today()]
         if d and d.best then d.best, d.strokes, d.par = nil, nil, nil; db.dailies = math.max(0, db.dailies - 1) end
@@ -917,7 +917,7 @@ function UI:RenderSurface(h)
         -- motion they stand still, so they are little chevrons that point downhill instead.
         local beads, row = {}, 0
         local GAP = 24
-        local decel = Putt.C.DECEL
+        local decel = Putt.C.DECEL * Putt.C.HOLD + 9     -- no ball stops on anything steeper than this: those beads glow orange
         local still = NS.db.settings.reducedMotion
         self.beadPool = self.beadPool or {}
         local bp = self.beadPool

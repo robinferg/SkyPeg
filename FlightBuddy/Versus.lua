@@ -107,7 +107,7 @@ end
 
 -- a number both clients must agree on before a match starts (different versions build different holes)
 function V.Fingerprint(c)
-    local s = 17
+    local s = 17 + NS.Putt.C.REV * 7919      -- (and the same rules for how a ball rolls)
     for _, h in ipairs(c.holes) do
         s = (s * 31 + h.par * 7 + floor(h.tee.x) + floor(h.tee.y) * 3 + floor(h.cup.x) * 5 + floor(h.cup.y) * 11
             + #(h.movers or {}) * 13 + #(h.actors or {}) * 19 + #(h.walls or {}) * 23 + #(h.bumpers or {}) * 29 + #(h.surface or {}) * 37 + floor(h.surf and (h.surf.hi - h.surf.lo) or 0) % 9973 * 41) % 1000003

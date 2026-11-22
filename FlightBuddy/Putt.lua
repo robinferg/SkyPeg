@@ -24,6 +24,12 @@ local P = {
     COIN_SEC = 3,       -- a lucky coin picked up on the way takes this much off your time
     MAX_BONUS = 0.5,    -- bonuses can take off at most this share of your clock
     SHOT_TIMEOUT = 14,
+    -- Grass slows a fast ball more than a slow one (see Putt.Friction). A ball at rest sits still on
+    -- any slope that pulls less than HOLD x the friction; once it is rolling slowly the grass holds
+    -- it less than that (SLIP, least at SLIP_V), so on a steep slope it keeps rolling downhill, at a
+    -- pace you can see, until the ground eases off.
+    HOLD = 0.62, SLIP = 0.55, SLIP_V = 24, CREEP_V = 120,
+    REV = 5,            -- goes up whenever the holes or the way a ball rolls change (old best times are retired)
     HOLES = 6,
     WOBBLE_FROM = 0.75,          -- above this power the putt starts losing accuracy...
     WOBBLE = math.rad(2.5),      -- ...up to this much random angle error at full power
@@ -34,6 +40,24 @@ local P = {
     FENCE_T = 3.5,               -- half the thickness of an added wall (PuttHard.lua "walls")
 }
 Putt.C = P
+
+-- What slows a ball rolling at speed sp over ground with this rolling resistance and drag.
+-- On sand, snow, ice and the like (plain = false) it is the plain sum, decel + drag x speed.
+-- Grass is the same at CREEP_V and above; below that both parts ease off. The resistance falls to
+-- SLIP of itself at SLIP_V and comes back up to HOLD as the ball stops, the way a thing is harder to
+-- start moving than to keep moving. So nothing creeps: on a slope a ball either stops, or rolls.
+function Putt.Friction(sp, decel, drag, plain)
+    if not plain or sp >= P.CREEP_V then return decel + drag * sp end
+    local k
+    if sp < P.SLIP_V then
+        k = 1 - sp / P.SLIP_V
+        k = P.SLIP + (P.HOLD - P.SLIP) * k * k
+    else
+        k = (sp - P.SLIP_V) / (P.CREEP_V - P.SLIP_V)
+        k = P.SLIP + (1 - P.SLIP) * k * k
+    end
+    return decel * k + drag * sp * sp / P.CREEP_V
+end
 
 -- terrain codes ------------------------------------------------------------
 -- decel/drag override grass; hazard = penalty stroke and return to last spot
@@ -698,7 +722,7 @@ do
     for i = 0, 90 do
         local v, d = i * 10, 0
         while v > P.STOP do
-            local nv = v - (P.DECEL + P.DRAG * v) * h
+            local nv = v - Putt.Friction(v, P.DECEL, P.DRAG, true) * h
             if nv < 0 then nv = 0 end
             d = d + (v + nv) * 0.5 * h
             v = nv
@@ -1173,7 +1197,7 @@ function Putt:RestFans()
     if not hole.fans[1] or (self.grace or 0) > 0 then return end
     if self.rest.x == hole.tee.x and self.rest.y == hole.tee.y and b.x == hole.tee.x and b.y == hole.tee.y then return end
     local t = TERRAIN[Putt.Cell(hole, b.x, b.y) or " "] or TERRAIN["."]
-    local grip = (t.decel or P.DECEL) * 1.15
+    local grip = (t.decel or (P.DECEL * P.HOLD)) * 1.15
     local pin = self.fanPin
     for i, f in ipairs(hole.fans) do
         if f.period then f.off = ((hole.clock or 0) % f.period) > f.period * 0.45 end
@@ -1549,9 +1573,11 @@ function Putt:Step(h)
     -- rolling friction
     local decel = gDecel or t.decel or P.DECEL
     local drag = gDrag or t.drag or P.DRAG
+    local plain = not (gDecel or t.decel)
     sp = sqrt(b.vx * b.vx + b.vy * b.vy)
     if sp > 0 then
-        local ns = sp - (decel + drag * sp) * h
+        -- (it eases as the ball slows: see HOLD)
+        local ns = sp - Putt.Friction(sp, decel, drag, plain) * h
         if ns < 0 then ns = 0 end
         local k = ns / sp
         b.vx, b.vy = b.vx * k, b.vy * k
@@ -1668,9 +1694,10 @@ function Putt:Step(h)
     -- come to rest
     sp = sqrt(b.vx * b.vx + b.vy * b.vy)
     if sp < P.STOP * 3 then b.still = (b.still or 0) + h else b.still = 0 end
-    local resting = (sp < P.STOP and not t.boost and not b.windy and lie < (t.decel or P.DECEL)
-            and (not t.slope or (t.decel or P.DECEL) > P.SLOPE * max(abs(t.slope[1]), abs(t.slope[2]))))
-        or (b.still > 0.7 and lie < (t.decel or P.DECEL))
+    local hold = t.decel or (P.DECEL * P.HOLD)      -- the steepest pull a ball can sit still against here
+    local resting = (sp < P.STOP and not t.boost and not b.windy and lie < hold
+            and (not t.slope or hold > P.SLOPE * max(abs(t.slope[1]), abs(t.slope[2]))))
+        or (b.still > 0.7 and lie < hold)
         or b.still > 1.0   -- held still for a second (pinned against a rail by a slope, say): it has stopped
     b.windy = false
     if resting or b.age > P.SHOT_TIMEOUT then
@@ -1887,7 +1914,7 @@ function Putt:Relief()
             local a = k * 2 * pi / n
             local x, y = x0 + cos(a) * ring, y0 + sin(a) * ring
             local lx, ly = Putt.Lie(hole, x, y)
-            if Putt.Clearance(hole, x, y) >= D and safeGround(hole, x, y) and lx * lx + ly * ly < P.DECEL * P.DECEL
+            if Putt.Clearance(hole, x, y) >= D and safeGround(hole, x, y) and lx * lx + ly * ly < (P.DECEL * P.HOLD) ^ 2
                 and (x - cup.x) ^ 2 + (y - cup.y) ^ 2 >= (P.CUP_R + 10) ^ 2 then
                 -- keep the ball on the same side of every rail (no hopping through walls)
                 local crosses = false
@@ -2119,7 +2146,7 @@ function Putt:Preview(angle, power, len)
         vx, vy = vx + ax * h, vy + ay * h
         local v = sqrt(vx * vx + vy * vy)
         if v > 0 then
-            local nv = v - ((t.decel or P.DECEL) + (t.drag or P.DRAG) * v) * h
+            local nv = v - Putt.Friction(v, t.decel or P.DECEL, t.drag or P.DRAG, not t.decel) * h
             if nv <= 2 then break end
             vx, vy, v = vx * nv / v, vy * nv / v, nv
         end
