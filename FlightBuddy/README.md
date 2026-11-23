@@ -44,7 +44,8 @@ The table stands the long way up and you shoot from the bottom.
   eight. The menu has a switch for classic solids and stripes.
 - **Eight-ball:** the first ball you pot after the break makes you Alliance or Horde (solids or stripes). Pot all seven, then the eight.
   Pot one of yours and you shoot again. A foul (the cue ball down a pocket, nothing struck, the wrong ball struck first)
-  gives the other player the cue ball in hand. The eight down too soon loses the frame.
+  gives the other player the cue ball in hand. Potting the eight before your seven are down, in the same
+  shot as your last ball, or on a foul (a scratch, or another ball struck first) loses the frame, and the card says which.
 - Three regulars: the Barkeep, the Brawler and the Hustler.
 - **Solo table** and **Daily Table:** clear every ball in as few shots as you can; a foul costs a shot.
 

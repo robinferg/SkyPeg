@@ -880,6 +880,11 @@ function UI:AfterShot(res)
         elseif res.passed then
             self:Say(you and (name .. " to shoot") or "Your shot", you and { 0.8, 0.8, 0.9 } or COLORS.gold, 1.6)
         end
+        -- the moment you get onto the eight, once a frame: what wins it and what loses it
+        if g.turn == "you" and g.group.you and g:Left(g.group.you) == 0 and not self.toldEight and not res.foul then
+            self.toldEight = true
+            self:Say("You are on the eight!\nPot it clean to win: a scratch loses the frame", COLORS.gold, 3.4)
+        end
     end
     self.placing = g.inHand and g.turn == "you"
     self.lifted = nil
@@ -907,7 +912,24 @@ function UI:ShowResult()
             buttons[#buttons + 1] = { "Play " .. Foe(g.foe + 1).name, function() self:Begin("match", { foe = g.foe + 1 }) end }
         end
         buttons[#buttons + 1] = { "Menu", function() self:ShowMenu() end, "ghost" }
-        local how = g.last and g.last.eight and ((g.winner == g.last.who) and "The eight is down." or "The eight went down too soon.") or ""
+        -- how the frame ended, and (when the eight lost it) exactly why
+        local how = ""
+        local last = g.last
+        if last and last.eight then
+            local mine = last.who == "you"
+            local who = mine and "You" or name
+            if g.winner == last.who then
+                how = mine and "The eight is down." or (name .. " potted the eight.")
+            elseif last.why == "scratch" then
+                how = ("%s potted the eight, but the cue ball went down as well.\nA scratch on the eight loses the frame."):format(who)
+            elseif last.why == "wrong" then
+                how = ("%s potted the eight, but the cue ball struck another ball first.\nPotting the eight on a foul loses the frame."):format(who)
+            elseif last.why == "together" then
+                how = ("%s potted the eight in the same shot as %s last ball.\nThe eight has to go down on a shot of its own."):format(who, mine and "your" or "their")
+            else
+                how = ("%s potted the eight before clearing %s own balls."):format(who, mine and "your" or "their")
+            end
+        end
         self.card:Open({
             title = won and "You win the frame!" or (name .. " wins"), color = won and COLORS.gold or TINT, center = true,
             body = ("%s\n\nAgainst %s: |cffffffff%d|r won, |cffffffff%d|r lost"):format(how, name, rec.w, rec.l),
@@ -1131,7 +1153,7 @@ function UI:Begin(mode, opts)
     if self.menu:IsShown() then self.menu:Hide() end
     if self.boardPanel:IsShown() then self.boardPanel:Hide() end
     local g = self.game
-    self.ai, self.pulling, self.aiming, self.lifted, self.finishPending = nil, nil, nil, nil, nil
+    self.ai, self.pulling, self.aiming, self.lifted, self.finishPending, self.toldEight = nil, nil, nil, nil, nil, nil
     self.power = 0
     if mode == "daily" then
         local d = self:Daily()
@@ -1260,7 +1282,7 @@ function UI:ShowHelp()
                 and "|cffffcc40Eight-ball|r: the first ball you pot after the break makes you |cff5c9dffAlliance|r (blue) or |cffff5040Horde|r (red). Pot all seven of yours, then the black eight, to win. Pot one of yours and you shoot again."
                 or "|cffffcc40Eight-ball|r: the first ball you pot after the break makes you solids or stripes. Pot all seven of yours, then the black eight, to win. Pot one of yours and you shoot again.",
             "",
-            "A |cffffcc40foul|r (the cue ball down a pocket, nothing struck, or the wrong ball struck first) gives the other player the cue ball in hand: it goes wherever they like. The eight down too soon loses the frame.",
+            "A |cffffcc40foul|r (the cue ball down a pocket, nothing struck, or the wrong ball struck first) gives the other player the cue ball in hand: it goes wherever they like. Potting the eight before your seven are down, in the same shot as your last ball, or on a foul (the cue ball goes down too, or it struck another ball first) loses the frame.",
             "",
             "|cffffcc40Solo|r and the |cffffcc40Daily Table|r: clear every ball in as few shots as you can. The daily table is the same for everyone.",
         }, "\n"),

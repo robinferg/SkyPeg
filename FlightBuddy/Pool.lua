@@ -433,6 +433,10 @@ function Pool:Resolve()
             self.phase = "over"
             self.winner = (cleared and not res.foul) and who or other
             res.eight = true
+            -- why, for the losing side: the eight is only good after your seven, by itself, on a clean shot
+            if self.winner ~= who then
+                res.why = (not cleared) and ((self.group[who] and mineDown > 0 and self:Left(self.group[who]) == 0) and "together" or "early") or res.foul
+            end
         else
             if not self.group[who] and not self.breakShot and not res.foul and anyDown > 0 then
                 for _, id in ipairs(self.potted) do

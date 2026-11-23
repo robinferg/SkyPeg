@@ -19,6 +19,7 @@
 - **Alliance and Horde balls:** seven blue with the Alliance crest, seven red with the Horde's, and a skull on the eight. A switch in the menu brings back classic solids and stripes
 - **Spin.** Drag the dot on the cue ball to where the tip should strike: high and the cue ball runs on after it hits, low and it stops dead or comes back, left or right and it comes off the cushions that way. Balls skid before they settle into a roll, as real ones do
 - Balls turn as they roll (the cue ball's two red dots give its spin away) and drop into the pockets
+- When the eight loses you the frame, the card says exactly why (the cue ball went down too, another ball was struck first, it went down with your last ball, or before your seven), and you are told the moment you get onto the eight
 - Three regulars to play, from the Barkeep to the Hustler. Pot the first ball after the break to take your seven, clear them, then the eight
 - Fouls give the other player the cue ball in hand
 - A Solo table and a Daily Table (the same balls for everyone): clear them in the fewest shots, with leaderboards for both
